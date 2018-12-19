@@ -34,7 +34,10 @@ enum class BasicStmtIndex
 {
     kBegin,     // BEGIN;
     kCommit,    // COMMIT;
-    kRollback,   // ROLLBACK;
+    kRollback,  // ROLLBACK;
+    kPragmaQueryOnlyTrue,   // PRAGMA query_only = TRUE;
+    kPragmaQueryOnlyFalse,  // PRAGMA query_only = FALSE;
+    kVacuum,    // VACUUM;
 
     kBasicStmtNumber
 };
@@ -149,6 +152,7 @@ private:
     );
 
     Errors StmtBindParameter_(_In_ const StmtInfo*& stmtInfo, _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList);
+    Errors VerifyTable_(_In_ const std::vector<std::string>& verifyTableStmtStringList);
 
 private:
     std::wstring databasePath_;

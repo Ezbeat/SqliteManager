@@ -10,7 +10,8 @@ enum class Errors
     kStopCallback,
 
     kUnsuccess,
-    kExistOpenDB    
+    kExistOpenDB,
+    kFailedVerifyTable
 };
 
 enum class CallbackErrors

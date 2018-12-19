@@ -18,8 +18,6 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
     _In_opt_ const std::vector<std::string>* createTableStmtStringList /*= nullptr*/
 )
 {
-    // ...ing verifyTableStmtList, createTableStmtList 명령 수행하기 ExecStmt 메서드에서 처리해야될듯..
-
     Errors retValue = Errors::kUnsuccess;
 
     int sqliteStatus = SQLITE_ERROR;
@@ -78,7 +76,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
     }
     
     sqliteStatus = sqlite3_open_v2(databasePathUtf8.c_str(), &database_, dbOpenFlags, nullptr);
-    if (sqliteStatus != SQLITE_OK)
+    if ((sqliteStatus != SQLITE_OK) || (VerifyTable_(verifyTableStmtStringList) != Errors::kSuccess))
     {
         // sqlite3_open_v2 함수가 실패해도 database_ 엔 값이 리턴 됨
         if (this->CloseDatabase() != Errors::kSuccess)
@@ -103,8 +101,25 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
         {
             return retValue;
         }
+        
+        // 테이블 생성
+        if (createTableStmtStringList->size() == 0)
+        {
+            return retValue;
+        }
 
-        // [TODO] 테이블 생성..
+        for (const auto& createTableStmtStringListEntry : *createTableStmtStringList)
+        {
+            if (_strnicmp(createTableStmtStringListEntry.c_str(), "CREATE ", strlen("CREATE ") != 0))
+            {
+                return retValue;
+            }
+
+            if (this->ExecStmt(createTableStmtStringListEntry) != Errors::kSuccess)
+            {
+                return retValue;
+            }
+        }
     }
 
     retValue = this->PrepareBasicStmt_();
@@ -388,6 +403,24 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareBasicStmt_()
         return retValue;
     }
 
+    retValue = this->PrepareStmt("PRAGMA query_only = TRUE;");
+    if (retValue != Errors::kSuccess)
+    {
+        return retValue;
+    }
+
+    retValue = this->PrepareStmt("PRAGMA query_only = FALSE;");
+    if (retValue != Errors::kSuccess)
+    {
+        return retValue;
+    }
+
+    retValue = this->PrepareStmt("VACUUM;");
+    if (retValue != Errors::kSuccess)
+    {
+        return retValue;
+    }
+
     retValue = Errors::kSuccess;
     return retValue;
 }
@@ -595,5 +628,69 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
     }
 
     retValue = Errors::kSuccess;
+    return retValue;
+}
+
+EzSqlite::Errors EzSqlite::SqliteManager::VerifyTable_(
+    _In_ const std::vector<std::string>& verifyTableStmtStringList
+)
+{
+    Errors retValue = Errors::kFailedVerifyTable;
+
+    int sqliteStatus = SQLITE_ERROR;
+
+    sqlite3_stmt* stmt = nullptr;
+
+    auto raii = RAIIRegister([&] 
+    {
+        if (stmt != nullptr)
+        {
+            sqlite3_finalize(stmt);
+            stmt = nullptr;
+        }
+    });
+
+    if (verifyTableStmtStringList.size() == 0)
+    {
+        retValue = Errors::kSuccess;
+        return retValue;
+    }
+
+    if (this->ExecStmt(static_cast<uint32_t>(BasicStmtIndex::kPragmaQueryOnlyTrue)) != Errors::kSuccess)
+    {
+        return retValue;
+    }
+
+    retValue = Errors::kSuccess;
+    for (const auto& verifyTableStmtStringListEntry : verifyTableStmtStringList)
+    {
+        if (_strnicmp(verifyTableStmtStringListEntry.c_str(), "SELECT ", strlen("SELECT ") != 0))
+        {
+            retValue = Errors::kFailedVerifyTable;
+            break;
+        }
+
+        sqliteStatus = sqlite3_prepare_v2(
+            database_,
+            verifyTableStmtStringListEntry.c_str(),
+            -1,
+            &stmt,
+            nullptr
+        );
+        if (sqliteStatus != SQLITE_OK)
+        {
+            retValue = Errors::kFailedVerifyTable;
+            break;
+        }
+
+        sqlite3_finalize(stmt);
+        stmt = nullptr;
+    }
+
+    if (this->ExecStmt(static_cast<uint32_t>(BasicStmtIndex::kPragmaQueryOnlyFalse)) != Errors::kSuccess)
+    {
+        return retValue;
+    }
+
     return retValue;
 }
