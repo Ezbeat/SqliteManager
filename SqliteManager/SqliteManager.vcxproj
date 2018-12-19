@@ -154,7 +154,6 @@
     <ClInclude Include="SqliteManager.h" />
     <ClInclude Include="SqliteManagerErrors.h" />
     <ClInclude Include="sqlite\sqlite3.h" />
-    <ClInclude Include="sqlite\sqlite3ext.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

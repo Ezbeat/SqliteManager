@@ -38,8 +38,5 @@
     <ClInclude Include="sqlite\sqlite3.h">
       <Filter>sqlite</Filter>
     </ClInclude>
-    <ClInclude Include="sqlite\sqlite3ext.h">
-      <Filter>sqlite</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>
