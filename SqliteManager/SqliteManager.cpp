@@ -229,7 +229,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
 
     if (preparedStmtIndex != nullptr)
     {
-        *preparedStmtIndex = preparedStmtInfoList_.size() - 1;
+        *preparedStmtIndex = static_cast<uint32_t>(preparedStmtInfoList_.size()) - 1;
     }
 
     retValue = Errors::kSuccess;
@@ -563,50 +563,50 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
             break;
 
         case StmtDataType::kText:
-            if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kNone)
+            if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kDestructorStatic)
             {
                 sqliteStatus = sqlite3_bind_text(
                     stmtInfo->stmt,
                     parameterIndex++,
                     reinterpret_cast<std::string::traits_type::char_type*>(stmtBindParameterInfoListEntry.data),
                     stmtBindParameterInfoListEntry.dataByteSize,
-                    reinterpret_cast<sqlite3_destructor_type>(StmtBindParameterOptions::kTransient)
+                    SQLITE_STATIC
                 );
             }
-            else if(stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kStatic ||
-                stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kTransient)
+            else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kNone ||
+                stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kDestructorTransient)
             {
                 sqliteStatus = sqlite3_bind_text(
                     stmtInfo->stmt,
                     parameterIndex++,
                     reinterpret_cast<std::string::traits_type::char_type*>(stmtBindParameterInfoListEntry.data),
                     stmtBindParameterInfoListEntry.dataByteSize,
-                    reinterpret_cast<sqlite3_destructor_type>(stmtBindParameterInfoListEntry.options)
+                    SQLITE_TRANSIENT
                 );
             }
 
             break;
 
         case StmtDataType::kBlob:
-            if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kNone)
+            if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kDestructorStatic)
             {
                 sqliteStatus = sqlite3_bind_blob(
                     stmtInfo->stmt,
                     parameterIndex++,
                     stmtBindParameterInfoListEntry.data,
                     stmtBindParameterInfoListEntry.dataByteSize,
-                    reinterpret_cast<sqlite3_destructor_type>(StmtBindParameterOptions::kTransient)
+                    SQLITE_STATIC
                 );
             }
-            else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kStatic ||
-                stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kTransient)
+            else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kNone ||
+                stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kDestructorTransient)
             {
                 sqliteStatus = sqlite3_bind_blob(
                     stmtInfo->stmt,
                     parameterIndex++,
                     stmtBindParameterInfoListEntry.data,
                     stmtBindParameterInfoListEntry.dataByteSize,
-                    reinterpret_cast<sqlite3_destructor_type>(stmtBindParameterInfoListEntry.options)
+                    SQLITE_TRANSIENT
                 );
             }
 

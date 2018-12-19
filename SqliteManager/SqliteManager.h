@@ -53,8 +53,8 @@ enum class StmtDataType
 
 enum class StmtBindParameterOptions
 {
-    kStatic = reinterpret_cast<const int32_t>(SQLITE_STATIC),
-    kTransient = reinterpret_cast<const int32_t>(SQLITE_TRANSIENT), // 내부 버퍼로 데이터 복사
+    kDestructorStatic,    // SQLITE_STATIC
+    kDestructorTransient, // SQLITE_TRANSIENT
 
     kNone
 };
@@ -71,7 +71,7 @@ struct StmtBindParameterInfo
     void* data;
     StmtDataType dataType;
     uint32_t dataByteSize;
-    StmtBindParameterOptions options;   // blob과 string interface인 경우 Default는 kTransient
+    StmtBindParameterOptions options;   // blob과 string interface인 경우 Default는 kDestructorTransient
 };
 
 struct StmtInfo
