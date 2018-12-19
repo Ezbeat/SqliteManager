@@ -124,7 +124,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
         }
     }
 
-    retValue = this->PrepareBasicStmt_();
+    retValue = PrepareBasicStmt_();
     if (retValue != Errors::kSuccess)
     {
         return retValue;
