@@ -10,7 +10,6 @@ enum class Errors
     kStopCallback,
 
     kUnsuccess,
-    kExistOpenDB,
     kFailedVerifyTable
 };
 

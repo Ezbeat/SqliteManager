@@ -21,7 +21,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
     Errors retValue = Errors::kUnsuccess;
 
     int sqliteStatus = SQLITE_ERROR;
-    int dbOpenFlags = 0;
+    int openFlags = 0;
 
     std::wstring_convert<std::codecvt_utf8<wchar_t>> convert;
     std::string databasePathUtf8;
@@ -34,11 +34,13 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
         }
     });
 
-    // SQLite Database가 이미 열려있는 경우 Close를 먼저 해줘야 함
+    // SQLite Database가 열려있는 경우
     if (database_ != nullptr)
     {
-        retValue = Errors::kExistOpenDB;
-        return retValue;
+        if (this->CloseDatabase() != Errors::kSuccess)
+        {
+            return retValue;
+        }
     }
 
     //
@@ -68,14 +70,14 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
     databasePathUtf8 = convert.to_bytes(databasePath);
     if (desiredAccess == DesiredAccess::kReadOnly)
     {
-        dbOpenFlags = SQLITE_OPEN_READONLY;
+        openFlags = SQLITE_OPEN_READONLY;
     }
     else if (desiredAccess == DesiredAccess::kReadWrite)
     {
-        dbOpenFlags = SQLITE_OPEN_READWRITE;
+        openFlags = SQLITE_OPEN_READWRITE;
     }
     
-    sqliteStatus = sqlite3_open_v2(databasePathUtf8.c_str(), &database_, dbOpenFlags, nullptr);
+    sqliteStatus = sqlite3_open_v2(databasePathUtf8.c_str(), &database_, openFlags, nullptr);
     if ((sqliteStatus != SQLITE_OK) || (VerifyTable_(verifyTableStmtStringList) != Errors::kSuccess))
     {
         // sqlite3_open_v2 함수가 실패해도 database_ 엔 값이 리턴 됨
@@ -96,7 +98,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
             }
         }
 
-        sqliteStatus = sqlite3_open_v2(databasePathUtf8.c_str(), &database_, dbOpenFlags | SQLITE_OPEN_CREATE, nullptr);
+        sqliteStatus = sqlite3_open_v2(databasePathUtf8.c_str(), &database_, openFlags | SQLITE_OPEN_CREATE, nullptr);
         if (sqliteStatus != SQLITE_OK)
         {
             return retValue;
