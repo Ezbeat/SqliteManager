@@ -154,7 +154,7 @@ private:
         _In_opt_ StepCallbackFunc* stmtStepCallback = nullptr
     );
 
-    Errors StmtBindParameter_(_In_ const StmtInfo*& stmtInfo, _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList);
+    Errors StmtBindParameter_(_In_ const StmtInfo* stmtInfo, _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList);
     Errors VerifyTable_(_In_ const std::vector<std::string>& verifyTableStmtStringList);
 
 private:

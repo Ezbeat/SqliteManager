@@ -532,7 +532,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
-    _In_ const StmtInfo*& stmtInfo, 
+    _In_ const StmtInfo* stmtInfo, 
     _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList
 )
 {
@@ -675,11 +675,6 @@ EzSqlite::Errors EzSqlite::SqliteManager::VerifyTable_(
         return retValue;
     }
 
-    if (this->ExecStmt(static_cast<uint32_t>(StmtIndex::kPragmaQueryOnlyTrue)) != Errors::kSuccess)
-    {
-        return retValue;
-    }
-
     retValue = Errors::kSuccess;
     for (const auto& verifyTableStmtStringListEntry : verifyTableStmtStringList)
     {
@@ -704,11 +699,6 @@ EzSqlite::Errors EzSqlite::SqliteManager::VerifyTable_(
 
         sqlite3_finalize(stmt);
         stmt = nullptr;
-    }
-
-    if (this->ExecStmt(static_cast<uint32_t>(StmtIndex::kPragmaQueryOnlyFalse)) != Errors::kSuccess)
-    {
-        return retValue;
     }
 
     return retValue;
