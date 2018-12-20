@@ -249,33 +249,31 @@ void EzSqlite::SqliteManager::ClearPreparedStmt(
         return;
     }
 
-    for (auto& stmtInfoListEntry : preparedStmtInfoList_)
+    for (uint32_t preparedStmtIndex = 0; preparedStmtIndex < preparedStmtInfoList_.size(); preparedStmtIndex++)
     {
-        if (stmtInfoListEntry.stmt != nullptr)
+        if (preparedStmtInfoList_[preparedStmtIndex].stmt != nullptr)
         {
-            sqlite3_finalize(stmtInfoListEntry.stmt);
-            stmtInfoListEntry.stmt = nullptr;
+            sqlite3_finalize(preparedStmtInfoList_[preparedStmtIndex].stmt);
+            preparedStmtInfoList_[preparedStmtIndex].stmt = nullptr;
+        }
+
+        if (resetPreparedStmtIndex == true)
+        {
+            // Prepared Statement는 순차적으로 저장되기 때문에 Pointer List Index와 Stmt Index가 같다.
+            __try
+            {
+                if ((preparedStmtIndexPointerList_[preparedStmtIndex] != nullptr) &&
+                    (*(preparedStmtIndexPointerList_[preparedStmtIndex]) == preparedStmtIndex))
+                {
+                    *(preparedStmtIndexPointerList_[preparedStmtIndex]) = static_cast<uint32_t>(StmtIndex::kNoIndex);
+                }
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER) {}
         }
     }
 
     preparedStmtInfoList_.clear();
-
-    if (resetPreparedStmtIndex == true)
-    {
-        for (auto preparedStmtIndexPointerListEntry : preparedStmtIndexPointerList_)
-        {
-            if (preparedStmtIndexPointerListEntry != nullptr)
-            {
-                __try
-                {
-                    *preparedStmtIndexPointerListEntry = static_cast<uint32_t>(StmtIndex::kNoIndex);
-                }
-                __except (EXCEPTION_EXECUTE_HANDLER) {}
-            }
-        }
-    }
-
-    preparedStmtIndexPointerList_.clear();
+    preparedStmtIndexPointerList_.clear();    
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::FindPreparedStmt(

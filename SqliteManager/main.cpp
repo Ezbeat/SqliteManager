@@ -101,7 +101,7 @@ int main(void)
     //sqliteManager.ExecStmt("SELECT * FROM PROCESSEVENT_TB WHERE C_TimeStamp > ? AND C_TimeStamp < ?;", &stmtBindParameterInfoList, &stepCallback);
     //sqliteManager.ExecStmt(preparedStmt1Index, &stmtBindParameterInfoList, &stepLambdaCallback);
 
-    sqliteManager.CloseDatabase();
+    sqliteManager.CloseDatabase(false, true);
 
     return 0;
 }
