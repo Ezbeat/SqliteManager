@@ -30,7 +30,7 @@ enum class CreationDisposition
     kOpenExisting   // DB 파일 있는 경우 열고, 실패할 경우 실패
 };
 
-enum class BasicStmtIndex
+enum class StmtIndex
 {
     kBegin,     // BEGIN;
     kCommit,    // COMMIT;
@@ -38,8 +38,11 @@ enum class BasicStmtIndex
     kPragmaQueryOnlyTrue,   // PRAGMA query_only = TRUE;
     kPragmaQueryOnlyFalse,  // PRAGMA query_only = FALSE;
     kVacuum,    // VACUUM;
+    kPragmaSynchronousOn,   // PRAGMA synchronous = ON;
+    kPragmaSynchronousOff,  // PRAGMA synchronous = OFF;
 
-    kBasicStmtNumber
+    kBasicStmtNumber,
+    kNoIndex = -1
 };
 
 enum class StmtDataType
@@ -142,7 +145,7 @@ private:
     };
 
 private:
-    Errors PrepareBasicStmt_();
+    Errors PrepareInternalStmt_();
     void GetStmtInfo_(_In_ sqlite3_stmt* stmt, _Out_ uint32_t& columnCount, _Out_ uint32_t& bindParameterCount);
 
     Errors ExecStmt_(

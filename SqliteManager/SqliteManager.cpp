@@ -124,7 +124,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
         }
     }
 
-    retValue = PrepareBasicStmt_();
+    retValue = PrepareInternalStmt_();
     if (retValue != Errors::kSuccess)
     {
         return retValue;
@@ -148,7 +148,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CloseDatabase(
     {
         if (retValue != Errors::kSuccess)
         {
-            PrepareBasicStmt_();
+            PrepareInternalStmt_();
         }
     });
 
@@ -290,6 +290,11 @@ EzSqlite::Errors EzSqlite::SqliteManager::FindPreparedStmt(
 {
     Errors retValue = Errors::kNotFound;
 
+    if (preparedStmtIndex == static_cast<uint32_t>(StmtIndex::kNoIndex))
+    {
+        return retValue;
+    }
+
     if (preparedStmtInfoList_.size() <= preparedStmtIndex)
     {
         return retValue;
@@ -375,7 +380,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt(
     return ExecStmt_(stmtInfo, stmtBindParameterInfoList, stmtStepCallback);
 }
 
-EzSqlite::Errors EzSqlite::SqliteManager::PrepareBasicStmt_()
+EzSqlite::Errors EzSqlite::SqliteManager::PrepareInternalStmt_()
 {
     Errors retValue = Errors::kUnsuccess;
 
@@ -418,6 +423,18 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareBasicStmt_()
     }
 
     retValue = this->PrepareStmt("VACUUM;");
+    if (retValue != Errors::kSuccess)
+    {
+        return retValue;
+    }
+
+    retValue = this->PrepareStmt("PRAGMA synchronous = ON;");
+    if (retValue != Errors::kSuccess)
+    {
+        return retValue;
+    }
+
+    retValue = this->PrepareStmt("PRAGMA synchronous = OFF;");
     if (retValue != Errors::kSuccess)
     {
         return retValue;
@@ -658,7 +675,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::VerifyTable_(
         return retValue;
     }
 
-    if (this->ExecStmt(static_cast<uint32_t>(BasicStmtIndex::kPragmaQueryOnlyTrue)) != Errors::kSuccess)
+    if (this->ExecStmt(static_cast<uint32_t>(StmtIndex::kPragmaQueryOnlyTrue)) != Errors::kSuccess)
     {
         return retValue;
     }
@@ -689,7 +706,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::VerifyTable_(
         stmt = nullptr;
     }
 
-    if (this->ExecStmt(static_cast<uint32_t>(BasicStmtIndex::kPragmaQueryOnlyFalse)) != Errors::kSuccess)
+    if (this->ExecStmt(static_cast<uint32_t>(StmtIndex::kPragmaQueryOnlyFalse)) != Errors::kSuccess)
     {
         return retValue;
     }
