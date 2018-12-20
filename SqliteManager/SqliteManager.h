@@ -108,10 +108,10 @@ public:
         _In_opt_ const std::vector<std::string>* createTableStmtStringList = nullptr
     );
 
-    Errors CloseDatabase(_In_opt_ bool deleteDatabase = false);
+    Errors CloseDatabase(_In_opt_ bool deleteDatabase = false, _In_opt_ bool resetPreparedStmtIndex = false);
 
     Errors PrepareStmt(_In_ const std::string& stmtString, _Out_opt_ uint32_t* preparedStmtIndex = nullptr);
-    void ClearPreparedStmt();
+    void ClearPreparedStmt(_In_opt_ bool resetPreparedStmtIndex = false);
 
     Errors FindPreparedStmt(_In_ const std::string& preparedStmtString, _Out_ const StmtInfo*& preparedStmtInfo);
     Errors FindPreparedStmt(_In_ uint32_t preparedStmtIndex, _Out_ const StmtInfo*& preparedStmtInfo);
@@ -162,6 +162,7 @@ private:
     sqlite3* database_;
 
     std::vector<StmtInfo> preparedStmtInfoList_;
+    std::vector<uint32_t*> preparedStmtIndexPointerList_;
 };
 
 } // namespace EzSqlite

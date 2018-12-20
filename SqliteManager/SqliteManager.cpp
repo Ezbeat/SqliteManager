@@ -137,7 +137,8 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::CloseDatabase(
-    _In_opt_ bool deleteDatabase /*= false*/ // true여도 이미 닫힌 경우엔 제거 불가
+    _In_opt_ bool deleteDatabase, /*= false*/ // true여도 이미 닫힌 경우엔 제거 불가
+    _In_opt_ bool resetPreparedStmtIndex /*= false*/
 )
 {
     Errors retValue = Errors::kUnsuccess;
@@ -158,7 +159,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CloseDatabase(
         return retValue;
     }
 
-    this->ClearPreparedStmt();
+    this->ClearPreparedStmt(resetPreparedStmtIndex);
 
     sqliteStatus = sqlite3_close(database_);
     if(sqliteStatus != SQLITE_OK)
@@ -228,6 +229,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
     GetStmtInfo_(stmtInfo.stmt, stmtInfo.columnCount, stmtInfo.bindParameterCount);
 
     preparedStmtInfoList_.push_back(stmtInfo);
+    preparedStmtIndexPointerList_.push_back(preparedStmtIndex);
 
     if (preparedStmtIndex != nullptr)
     {
@@ -238,7 +240,9 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
     return retValue;
 }
 
-void EzSqlite::SqliteManager::ClearPreparedStmt()
+void EzSqlite::SqliteManager::ClearPreparedStmt(
+    _In_opt_ bool resetPreparedStmtIndex /*= false*/
+)
 {
     if (preparedStmtInfoList_.size() == 0)
     {
@@ -255,6 +259,23 @@ void EzSqlite::SqliteManager::ClearPreparedStmt()
     }
 
     preparedStmtInfoList_.clear();
+
+    if (resetPreparedStmtIndex == true)
+    {
+        for (auto preparedStmtIndexPointerListEntry : preparedStmtIndexPointerList_)
+        {
+            if (preparedStmtIndexPointerListEntry != nullptr)
+            {
+                __try
+                {
+                    *preparedStmtIndexPointerListEntry = static_cast<uint32_t>(StmtIndex::kNoIndex);
+                }
+                __except (EXCEPTION_EXECUTE_HANDLER) {}
+            }
+        }
+    }
+
+    preparedStmtIndexPointerList_.clear();
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::FindPreparedStmt(
