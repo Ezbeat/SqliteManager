@@ -607,7 +607,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                     stmtInfo->stmt,
                     parameterIndex++,
                     reinterpret_cast<const std::string::traits_type::char_type*>(stmtBindParameterInfoListEntry.data),
-                    stmtBindParameterInfoListEntry.dataByteSize,
+                    stmtBindParameterInfoListEntry.dataByteSize == 0 ? -1 : stmtBindParameterInfoListEntry.dataByteSize,
                     SQLITE_STATIC
                 );
             }
@@ -618,7 +618,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                     stmtInfo->stmt,
                     parameterIndex++,
                     reinterpret_cast<const std::string::traits_type::char_type*>(stmtBindParameterInfoListEntry.data),
-                    stmtBindParameterInfoListEntry.dataByteSize,
+                    stmtBindParameterInfoListEntry.dataByteSize == 0 ? -1 : stmtBindParameterInfoListEntry.dataByteSize,
                     SQLITE_TRANSIENT
                 );
             }
