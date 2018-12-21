@@ -574,7 +574,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 sqliteStatus = sqlite3_bind_int(
                     stmtInfo->stmt, 
                     parameterIndex++, 
-                    *reinterpret_cast<int32_t*>(stmtBindParameterInfoListEntry.data)
+                    *reinterpret_cast<const int32_t*>(stmtBindParameterInfoListEntry.data)
                 );
             }
             else if (stmtBindParameterInfoListEntry.dataByteSize <= sizeof(int64_t))
@@ -582,7 +582,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 sqliteStatus = sqlite3_bind_int64(
                     stmtInfo->stmt,
                     parameterIndex++,
-                    *(reinterpret_cast<int64_t*>(stmtBindParameterInfoListEntry.data))
+                    *(reinterpret_cast<const int64_t*>(stmtBindParameterInfoListEntry.data))
                 );
             }
 
@@ -594,7 +594,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 sqliteStatus = sqlite3_bind_double(
                     stmtInfo->stmt,
                     parameterIndex++,
-                    *reinterpret_cast<double_t*>(stmtBindParameterInfoListEntry.data)
+                    *reinterpret_cast<const double_t*>(stmtBindParameterInfoListEntry.data)
                 );
             }
 
@@ -606,7 +606,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 sqliteStatus = sqlite3_bind_text(
                     stmtInfo->stmt,
                     parameterIndex++,
-                    reinterpret_cast<std::string::traits_type::char_type*>(stmtBindParameterInfoListEntry.data),
+                    reinterpret_cast<const std::string::traits_type::char_type*>(stmtBindParameterInfoListEntry.data),
                     stmtBindParameterInfoListEntry.dataByteSize,
                     SQLITE_STATIC
                 );
@@ -617,7 +617,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 sqliteStatus = sqlite3_bind_text(
                     stmtInfo->stmt,
                     parameterIndex++,
-                    reinterpret_cast<std::string::traits_type::char_type*>(stmtBindParameterInfoListEntry.data),
+                    reinterpret_cast<const std::string::traits_type::char_type*>(stmtBindParameterInfoListEntry.data),
                     stmtBindParameterInfoListEntry.dataByteSize,
                     SQLITE_TRANSIENT
                 );

@@ -71,7 +71,7 @@ struct StmtBindParameterInfo
         options = StmtBindParameterOptions::kNone;
     };
 
-    void* data;
+    const void* data;
     StmtDataType dataType;
     uint32_t dataByteSize;
     StmtBindParameterOptions options;   // blob과 string interface인 경우 Default는 kDestructorTransient
