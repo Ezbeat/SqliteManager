@@ -35,11 +35,7 @@ enum class StmtIndex
     kBegin,     // BEGIN;
     kCommit,    // COMMIT;
     kRollback,  // ROLLBACK;
-    kPragmaQueryOnlyTrue,   // PRAGMA query_only = TRUE;
-    kPragmaQueryOnlyFalse,  // PRAGMA query_only = FALSE;
     kVacuum,    // VACUUM;
-    kPragmaSynchronousOn,   // PRAGMA synchronous = ON;
-    kPragmaSynchronousOff,  // PRAGMA synchronous = OFF;
 
     kBasicStmtNumber,
     kNoIndex = -1
@@ -113,6 +109,8 @@ public:
     Errors PrepareStmt(_In_ const std::string& stmtString, _Out_opt_ uint32_t* preparedStmtIndex = nullptr);
     void ClearPreparedStmt(_In_opt_ bool resetPreparedStmtIndex = false);
 
+    // preparedStmtInfo에 리턴되는 StmtInfo 주소 값은 vector 내 주소이므로 preparedStmtInfoList_에 값 변동 시 쓰레기 값이 됨.
+    // 즉, 안전하게 사용하려면 사용하려는 값을 복사해놓고 쓰는게 좋음.
     Errors FindPreparedStmt(_In_ const std::string& preparedStmtString, _Out_ const StmtInfo*& preparedStmtInfo);
     Errors FindPreparedStmt(_In_ uint32_t preparedStmtIndex, _Out_ const StmtInfo*& preparedStmtInfo);
 

@@ -28,7 +28,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
 
     auto raii = RAIIRegister([&] 
     {
-        if (retValue != Errors::kSuccess)
+        if (retValue == Errors::kUnsuccess)
         {
             this->CloseDatabase();
         }
@@ -37,6 +37,17 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
     // SQLite Database가 열려있는 경우
     if (database_ != nullptr)
     {
+        if (creationDisposition == CreationDisposition::kOpenAlways ||
+            creationDisposition == CreationDisposition::kOpenExisting)
+        {
+            // 열려있는 Database와 경로가 같고 테이블 구조가 같은 경우 kAlreadyOpen 리턴
+            if ((databasePath_ == databasePath) && (VerifyTable_(verifyTableStmtStringList) == Errors::kSuccess))
+            {
+                retValue = Errors::kAlreadyOpen;
+                return retValue;
+            }
+        }
+
         if (this->CloseDatabase() != Errors::kSuccess)
         {
             return retValue;
@@ -429,31 +440,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareInternalStmt_()
         return retValue;
     }
 
-    retValue = this->PrepareStmt("PRAGMA query_only = TRUE;");
-    if (retValue != Errors::kSuccess)
-    {
-        return retValue;
-    }
-
-    retValue = this->PrepareStmt("PRAGMA query_only = FALSE;");
-    if (retValue != Errors::kSuccess)
-    {
-        return retValue;
-    }
-
     retValue = this->PrepareStmt("VACUUM;");
-    if (retValue != Errors::kSuccess)
-    {
-        return retValue;
-    }
-
-    retValue = this->PrepareStmt("PRAGMA synchronous = ON;");
-    if (retValue != Errors::kSuccess)
-    {
-        return retValue;
-    }
-
-    retValue = this->PrepareStmt("PRAGMA synchronous = OFF;");
     if (retValue != Errors::kSuccess)
     {
         return retValue;

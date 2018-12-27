@@ -6,6 +6,7 @@ namespace EzSqlite
 enum class Errors
 {
     kSuccess,
+    kAlreadyOpen,
     kNotFound,
     kStopCallback,
 
