@@ -41,6 +41,37 @@ enum class StmtIndex
     kNoIndex = -1
 };
 
+// SQLite에서 제공하는 모든 Syntax를 고려하진 않음 (많이 쓰는 형태만 고려)
+enum class StmtType
+{
+    kAlterTable,            // ALTER TABLE
+    kAnalyze,               // ANALYZE
+    kAttach,                // ATTACH
+    kBegin,                 // BEGIN
+    kCommit,                // COMMIT
+    kCreateIndex,           // CREATE INDEX, CREATE UNIQUE INDEX
+    kCreateTable,           // CREATE TABLE, CREATE TEMP TABLE, CREATE TEMPORARY TABLE
+    kCreateTrigger,         // CREATE TRIGGER, CREATE TEMP TRIGGER, CREATE TEMPORARY TRIGGER
+    kCreateView,            // CREATE VIEW, CREATE TEMP VIEW, CREATE TEMPORARY VIEW
+    kCreateVirtualTable,    // CREATE VIRTUAL TABLE
+    kDelete,                // DELETE FROM
+    kDetach,                // DETACH
+    kDropIndex,             // DROP INDEX
+    kDropTable,             // DROP TABLE
+    kDropTrigger,           // DROP TRIGGER
+    kDropView,              // DROP VIEW
+    kInsert,                // INSERT INTO
+    kPragma,                // PRAGMA
+    kReindex,               // REINDEX
+    kRelease,               // RELEASE
+    kRollback,              // ROLLBACK
+    kSavepoint,             // SAVEPOINT
+    kSelect,                // SELECT
+    kUpdate,                // UPDATE
+    kVacuum,                // VACUUM
+    kUnknown
+};
+
 enum class StmtDataType
 {
     kInteger = SQLITE_INTEGER,
@@ -83,7 +114,7 @@ struct StmtInfo
     };
 
     mutable sqlite3_stmt* stmt; // 외부 라이브러리 변수라서 mutable 선언
-    std::string stmtString;
+    StmtType stmtType;
     uint32_t columnCount;
     uint32_t bindParameterCount;
 };
@@ -144,7 +175,10 @@ private:
 
 private:
     Errors PrepareInternalStmt_();
-    void GetStmtInfo_(_In_ sqlite3_stmt* stmt, _Out_ uint32_t& columnCount, _Out_ uint32_t& bindParameterCount);
+
+    void GetStmtInfo_(_In_ sqlite3_stmt* stmt, _Out_ StmtType& stmtType, _Out_ uint32_t& columnCount, _Out_ uint32_t& bindParameterCount);
+    StmtType GetStmtType_(_In_ const std::string::traits_type::char_type* stmtString);
+    const std::string::traits_type::char_type* GetPreparedStmtString_(_In_ sqlite3_stmt* stmt, _In_opt_ bool withBoundParameters = false);    
 
     Errors ExecStmt_(
         _In_ const StmtInfo* stmtInfo,

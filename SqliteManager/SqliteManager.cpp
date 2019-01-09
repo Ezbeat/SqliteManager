@@ -236,8 +236,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
         return retValue;
     }
 
-    stmtInfo.stmtString = stmtString;
-    GetStmtInfo_(stmtInfo.stmt, stmtInfo.columnCount, stmtInfo.bindParameterCount);
+    GetStmtInfo_(stmtInfo.stmt, stmtInfo.stmtType, stmtInfo.columnCount, stmtInfo.bindParameterCount);
 
     preparedStmtInfoList_.push_back(stmtInfo);
     preparedStmtIndexPointerList_.push_back(preparedStmtIndex);
@@ -301,7 +300,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::FindPreparedStmt(
 
     for (const auto& preparedStmtInfoListEntry : preparedStmtInfoList_)
     {
-        if (preparedStmtInfoListEntry.stmtString == preparedStmtString)
+        if (strcmp(GetPreparedStmtString_(preparedStmtInfoListEntry.stmt), preparedStmtString.c_str()) == 0)
         {
             preparedStmtInfo = &preparedStmtInfoListEntry;
             
@@ -379,8 +378,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt(
             return retValue;
         }
 
-        stmtInfo.stmtString = stmtString;
-        GetStmtInfo_(stmtInfo.stmt, stmtInfo.columnCount, stmtInfo.bindParameterCount);
+        GetStmtInfo_(stmtInfo.stmt, stmtInfo.stmtType, stmtInfo.columnCount, stmtInfo.bindParameterCount);
     }
 
     return ExecStmt_(&stmtInfo, stmtBindParameterInfoList, stmtStepCallback);
@@ -452,10 +450,12 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareInternalStmt_()
 
 void EzSqlite::SqliteManager::GetStmtInfo_(
     _In_ sqlite3_stmt* stmt, 
+    _Out_ StmtType& stmtType,
     _Out_ uint32_t& columnCount, 
     _Out_ uint32_t& bindParameterCount
 )
 {
+    stmtType = StmtType::kUnknown;
     columnCount = 0;
     bindParameterCount = 0;
 
@@ -464,10 +464,145 @@ void EzSqlite::SqliteManager::GetStmtInfo_(
         return;
     }
 
+    stmtType = GetStmtType_(GetPreparedStmtString_(stmt));
     columnCount = sqlite3_column_count(stmt);
     bindParameterCount = sqlite3_bind_parameter_count(stmt);
 
     return;
+}
+
+EzSqlite::StmtType EzSqlite::SqliteManager::GetStmtType_(
+    _In_ const std::string::traits_type::char_type* stmtString
+)
+{
+    uint32_t stmtStringLength = static_cast<uint32_t>(strlen(stmtString));
+
+    if ((strlen("ALTER TABLE") <= stmtStringLength) && (_strnicmp("ALTER TABLE", stmtString, strlen("ALTER TABLE")) == 0))
+    {
+        return StmtType::kAlterTable;
+    }
+    else if ((strlen("ANALYZE") <= stmtStringLength) && (_strnicmp("ANALYZE", stmtString, strlen("ANALYZE")) == 0))
+    {
+        return StmtType::kAnalyze;
+    }
+    else if ((strlen("ATTACH") <= stmtStringLength) && (_strnicmp("ATTACH", stmtString, strlen("ATTACH")) == 0))
+    {
+        return StmtType::kAttach;
+    }
+    else if ((strlen("BEGIN") <= stmtStringLength) && (_strnicmp("BEGIN", stmtString, strlen("BEGIN")) == 0))
+    {
+        return StmtType::kBegin;
+    }
+    else if ((strlen("COMMIT") <= stmtStringLength) && (_strnicmp("COMMIT", stmtString, strlen("COMMIT")) == 0))
+    {
+        return StmtType::kCommit;
+    }
+    else if (((strlen("CREATE INDEX") <= stmtStringLength) && (_strnicmp("CREATE INDEX", stmtString, strlen("CREATE INDEX")) == 0)) ||
+        ((strlen("CREATE UNIQUE INDEX") <= stmtStringLength) && (_strnicmp("CREATE UNIQUE INDEX", stmtString, strlen("CREATE UNIQUE INDEX")) == 0)))
+    {
+        return StmtType::kCreateIndex;
+    }
+    else if (((strlen("CREATE TABLE") <= stmtStringLength) && (_strnicmp("CREATE TABLE", stmtString, strlen("CREATE TABLE")) == 0)) ||
+        ((strlen("CREATE TEMP TABLE") <= stmtStringLength) && (_strnicmp("CREATE TEMP TABLE", stmtString, strlen("CREATE TEMP TABLE")) == 0)) ||
+        ((strlen("CREATE TEMPORARY TABLE") <= stmtStringLength) && (_strnicmp("CREATE TEMPORARY TABLE", stmtString, strlen("CREATE TEMPORARY TABLE")) == 0)))
+    {
+        return StmtType::kCreateTable;
+    }
+    else if (((strlen("CREATE TRIGGER") <= stmtStringLength) && (_strnicmp("CREATE TRIGGER", stmtString, strlen("CREATE TRIGGER")) == 0)) ||
+        ((strlen("CREATE TEMP TRIGGER") <= stmtStringLength) && (_strnicmp("CREATE TEMP TRIGGER", stmtString, strlen("CREATE TEMP TRIGGER")) == 0)) ||
+        ((strlen("CREATE TEMPORARY TRIGGER") <= stmtStringLength) && (_strnicmp("CREATE TEMPORARY TRIGGER", stmtString, strlen("CREATE TEMPORARY TRIGGER")) == 0)))
+    {
+        return StmtType::kCreateTrigger;
+    }
+    else if (((strlen("CREATE VIEW") <= stmtStringLength) && (_strnicmp("CREATE VIEW", stmtString, strlen("CREATE VIEW")) == 0)) ||
+        ((strlen("CREATE TEMP VIEW") <= stmtStringLength) && (_strnicmp("CREATE TEMP VIEW", stmtString, strlen("CREATE TEMP VIEW")) == 0)) ||
+        ((strlen("CREATE TEMPORARY VIEW") <= stmtStringLength) && (_strnicmp("CREATE TEMPORARY VIEW", stmtString, strlen("CREATE TEMPORARY VIEW")) == 0)))
+    {
+        return StmtType::kCreateView;
+    }
+    else if ((strlen("CREATE VIRTUAL TABLE") <= stmtStringLength) && (_strnicmp("CREATE VIRTUAL TABLE", stmtString, strlen("CREATE VIRTUAL TABLE")) == 0))
+    {
+        return StmtType::kCreateVirtualTable;
+    }
+    else if ((strlen("DELETE FROM") <= stmtStringLength) && (_strnicmp("DELETE FROM", stmtString, strlen("DELETE FROM")) == 0))
+    {
+        return StmtType::kDelete;
+    }
+    else if ((strlen("DETACH") <= stmtStringLength) && (_strnicmp("DETACH", stmtString, strlen("DETACH")) == 0))
+    {
+        return StmtType::kDetach;
+    }
+    else if ((strlen("DROP INDEX") <= stmtStringLength) && (_strnicmp("DROP INDEX", stmtString, strlen("DROP INDEX")) == 0))
+    {
+        return StmtType::kDropIndex;
+    }
+    else if ((strlen("DROP TABLE") <= stmtStringLength) && (_strnicmp("DROP TABLE", stmtString, strlen("DROP TABLE")) == 0))
+    {
+        return StmtType::kDropTable;
+    }
+    else if ((strlen("DROP TRIGGER") <= stmtStringLength) && (_strnicmp("DROP TRIGGER", stmtString, strlen("DROP TRIGGER")) == 0))
+    {
+        return StmtType::kDropTrigger;
+    }
+    else if ((strlen("DROP VIEW") <= stmtStringLength) && (_strnicmp("DROP VIEW", stmtString, strlen("DROP VIEW")) == 0))
+    {
+        return StmtType::kDropView;
+    }
+    else if ((strlen("INSERT INTO") <= stmtStringLength) && (_strnicmp("INSERT INTO", stmtString, strlen("INSERT INTO")) == 0))
+    {
+        return StmtType::kInsert;
+    }
+    else if ((strlen("PRAGMA") <= stmtStringLength) && (_strnicmp("PRAGMA", stmtString, strlen("PRAGMA")) == 0))
+    {
+        return StmtType::kPragma;
+    }
+    else if ((strlen("REINDEX") <= stmtStringLength) && (_strnicmp("REINDEX", stmtString, strlen("REINDEX")) == 0))
+    {
+        return StmtType::kReindex;
+    }
+    else if ((strlen("RELEASE") <= stmtStringLength) && (_strnicmp("RELEASE", stmtString, strlen("RELEASE")) == 0))
+    {
+        return StmtType::kRelease;
+    }
+    else if ((strlen("ROLLBACK") <= stmtStringLength) && (_strnicmp("ROLLBACK", stmtString, strlen("ROLLBACK")) == 0))
+    {
+        return StmtType::kRollback;
+    }
+    else if ((strlen("SAVEPOINT") <= stmtStringLength) && (_strnicmp("SAVEPOINT", stmtString, strlen("SAVEPOINT")) == 0))
+    {
+        return StmtType::kSavepoint;
+    }
+    else if ((strlen("SELECT") <= stmtStringLength) && (_strnicmp("SELECT", stmtString, strlen("SELECT")) == 0))
+    {
+        return StmtType::kSelect;
+    }
+    else if ((strlen("UPDATE") <= stmtStringLength) && (_strnicmp("UPDATE", stmtString, strlen("UPDATE")) == 0))
+    {
+        return StmtType::kUpdate;
+    }
+    else if ((strlen("VACUUM") <= stmtStringLength) && (_strnicmp("VACUUM", stmtString, strlen("VACUUM")) == 0))
+    {
+        return StmtType::kVacuum;
+    }
+    else
+    {
+        return StmtType::kUnknown;
+    }
+}
+
+const std::string::traits_type::char_type* EzSqlite::SqliteManager::GetPreparedStmtString_(
+    _In_ sqlite3_stmt* stmt,
+    _In_opt_ bool withBoundParameters /*= false*/
+)
+{
+    if (withBoundParameters == false)
+    {
+        return sqlite3_sql(stmt);
+    }
+    else
+    {
+        return sqlite3_expanded_sql(stmt);
+    }
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
@@ -479,6 +614,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
     Errors retValue = Errors::kUnsuccess;
 
     int sqliteStatus = SQLITE_ERROR;
+    uint32_t stepCount = 0;
     CallbackErrors callbackStatus;
 
     auto raii = RAIIRegister([&]
@@ -507,6 +643,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
     }
 
     sqliteStatus = sqlite3_step(stmtInfo->stmt);
+    stepCount++;
 
     do
     {
@@ -521,7 +658,15 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
         }
         else if (sqliteStatus == SQLITE_DONE)
         {
-            retValue = Errors::kSuccess;
+            if ((stmtInfo->stmtType == StmtType::kSelect) && (stepCount == 1))
+            {
+                retValue = Errors::kNotFound;
+            }
+            else
+            {
+                retValue = Errors::kSuccess;
+            }
+            
             break;
         }
         else
@@ -531,6 +676,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
         }
 
         sqliteStatus = sqlite3_step(stmtInfo->stmt);
+        stepCount++;
 
     } while (true);
 
