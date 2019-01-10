@@ -9,6 +9,7 @@ enum class Errors
     kAlreadyOpen,
     kNotFound,
     kStopCallback,
+    kFailCallback,
 
     kUnsuccess,
     kFailedVerifyTable
@@ -17,7 +18,9 @@ enum class Errors
 enum class CallbackErrors
 {
     kContinue,
-    kStop
+    kStop,
+
+    kFail
 };
 } // namespace EzSqlite
 

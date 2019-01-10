@@ -655,6 +655,11 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
                 retValue = Errors::kStopCallback;
                 break;
             }
+            else if (callbackStatus == CallbackErrors::kFail)
+            {
+                retValue = Errors::kFailCallback;
+                break;
+            }
         }
         else if (sqliteStatus == SQLITE_DONE)
         {
