@@ -83,8 +83,13 @@ enum class StmtDataType
 
 enum class StmtBindParameterOptions
 {
+    // StmtDataType::kText, StmtDataType::kBlob
     kDestructorStatic,    // SQLITE_STATIC
     kDestructorTransient, // SQLITE_TRANSIENT
+
+    // StmtDataType::kInteger
+    kSigned,
+    kUnsigned,
 
     kNone
 };

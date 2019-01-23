@@ -707,27 +707,95 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
         switch (stmtBindParameterInfoListEntry.dataType)
         {
         case StmtDataType::kInteger:
-            if (stmtBindParameterInfoListEntry.dataByteSize <= sizeof(int32_t))
+            if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(int8_t))
             {
-                sqliteStatus = sqlite3_bind_int(
-                    stmtInfo->stmt, 
-                    parameterIndex++, 
-                    *reinterpret_cast<const int32_t*>(stmtBindParameterInfoListEntry.data)
-                );
+                if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
+                {
+                    sqliteStatus = sqlite3_bind_int(
+                        stmtInfo->stmt,
+                        parameterIndex++,
+                        *reinterpret_cast<const int8_t*>(stmtBindParameterInfoListEntry.data)
+                    );
+                }
+                else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
+                {
+                    sqliteStatus = sqlite3_bind_int(
+                        stmtInfo->stmt,
+                        parameterIndex++,
+                        *reinterpret_cast<const uint8_t*>(stmtBindParameterInfoListEntry.data)
+                    );
+                }
             }
-            else if (stmtBindParameterInfoListEntry.dataByteSize <= sizeof(int64_t))
+            else if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(int16_t))
             {
-                sqliteStatus = sqlite3_bind_int64(
-                    stmtInfo->stmt,
-                    parameterIndex++,
-                    *(reinterpret_cast<const int64_t*>(stmtBindParameterInfoListEntry.data))
-                );
+                if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
+                {
+                    sqliteStatus = sqlite3_bind_int(
+                        stmtInfo->stmt,
+                        parameterIndex++,
+                        *reinterpret_cast<const int16_t*>(stmtBindParameterInfoListEntry.data)
+                    );
+                }
+                else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
+                {
+                    sqliteStatus = sqlite3_bind_int(
+                        stmtInfo->stmt,
+                        parameterIndex++,
+                        *reinterpret_cast<const uint16_t*>(stmtBindParameterInfoListEntry.data)
+                    );
+                }
+            }
+            else if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(int32_t))
+            {
+                if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
+                {
+                    sqliteStatus = sqlite3_bind_int(
+                        stmtInfo->stmt,
+                        parameterIndex++,
+                        *reinterpret_cast<const int32_t*>(stmtBindParameterInfoListEntry.data)
+                    );
+                }
+                else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
+                {
+                    sqliteStatus = sqlite3_bind_int(
+                        stmtInfo->stmt,
+                        parameterIndex++,
+                        *reinterpret_cast<const uint32_t*>(stmtBindParameterInfoListEntry.data)
+                    );
+                }
+            }
+            else if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(int64_t))
+            {
+                if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
+                {
+                    sqliteStatus = sqlite3_bind_int64(
+                        stmtInfo->stmt,
+                        parameterIndex++,
+                        *reinterpret_cast<const int64_t*>(stmtBindParameterInfoListEntry.data)
+                    );
+                }
+                else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
+                {
+                    sqliteStatus = sqlite3_bind_int64(
+                        stmtInfo->stmt,
+                        parameterIndex++,
+                        *reinterpret_cast<const uint64_t*>(stmtBindParameterInfoListEntry.data)
+                    );
+                }
             }
 
             break;
 
         case StmtDataType::kFloat:
-            if (stmtBindParameterInfoListEntry.dataByteSize <= sizeof(double_t))
+            if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(float_t))
+            {
+                sqliteStatus = sqlite3_bind_double(
+                    stmtInfo->stmt,
+                    parameterIndex++,
+                    *reinterpret_cast<const float_t*>(stmtBindParameterInfoListEntry.data)
+                );
+            }
+            else if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(double_t))
             {
                 sqliteStatus = sqlite3_bind_double(
                     stmtInfo->stmt,
