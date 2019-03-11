@@ -381,7 +381,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt(
         GetStmtInfo_(stmtInfo.stmt, stmtInfo.stmtType, stmtInfo.columnCount, stmtInfo.bindParameterCount);
     }
 
-    return ExecStmt_(&stmtInfo, stmtBindParameterInfoList, stmtStepCallback);
+    return ExecStmt_(stmtInfo, stmtBindParameterInfoList, stmtStepCallback);
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt(
@@ -405,7 +405,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt(
         return retValue;
     }
 
-    return ExecStmt_(stmtInfo, stmtBindParameterInfoList, stmtStepCallback);
+    return ExecStmt_(*stmtInfo, stmtBindParameterInfoList, stmtStepCallback);
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::PrepareInternalStmt_()
@@ -612,7 +612,7 @@ const std::string::traits_type::char_type* EzSqlite::SqliteManager::GetPreparedS
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
-    _In_ const StmtInfo* stmtInfo,
+    _In_ const StmtInfo stmtInfo,
     _In_opt_ const std::vector<StmtBindParameterInfo>* stmtBindParameterInfoList /*= nullptr */,
     _In_opt_ StepCallbackFunc* stmtStepCallback /*= nullptr*/
 )
@@ -625,37 +625,37 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
 
     auto raii = RAIIRegister([&]
     {
-        sqlite3_clear_bindings(stmtInfo->stmt);
-        sqlite3_reset(stmtInfo->stmt);
+        sqlite3_clear_bindings(stmtInfo.stmt);
+        sqlite3_reset(stmtInfo.stmt);
     });
 
     // Bind Parameter
-    if (stmtInfo->bindParameterCount != 0)
+    if (stmtInfo.bindParameterCount != 0)
     {
         if (stmtBindParameterInfoList == nullptr)
         {
             return retValue;
         }
-        else if (stmtInfo->bindParameterCount != stmtBindParameterInfoList->size())
+        else if (stmtInfo.bindParameterCount != stmtBindParameterInfoList->size())
         {
             return retValue;
         }
 
-        retValue = StmtBindParameter_(stmtInfo, *stmtBindParameterInfoList);
+        retValue = StmtBindParameter_(&stmtInfo, *stmtBindParameterInfoList);
         if (retValue != Errors::kSuccess)
         {
             return retValue;
         }
     }
 
-    sqliteStatus = SqliteStep_(stmtInfo->stmt);
+    sqliteStatus = SqliteStep_(stmtInfo.stmt);
     stepCount++;   
 
     do
     {
         if (sqliteStatus == SQLITE_ROW && stmtStepCallback != nullptr)
         {
-            callbackStatus = (*stmtStepCallback)(*stmtInfo);
+            callbackStatus = (*stmtStepCallback)(stmtInfo);
             if (callbackStatus == CallbackErrors::kStop)
             {
                 retValue = Errors::kStopCallback;
@@ -669,7 +669,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
         }
         else if (sqliteStatus == SQLITE_DONE)
         {
-            if ((stmtInfo->stmtType == StmtType::kSelect) && (stepCount == 1))
+            if ((stmtInfo.stmtType == StmtType::kSelect) && (stepCount == 1))
             {
                 retValue = Errors::kNotFound;
             }
@@ -686,7 +686,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
             break;
         }
 
-        sqliteStatus = SqliteStep_(stmtInfo->stmt);
+        sqliteStatus = SqliteStep_(stmtInfo.stmt);
         stepCount++;
 
     } while (true);

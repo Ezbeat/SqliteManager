@@ -188,8 +188,9 @@ private:
     StmtType GetStmtType_(_In_ const std::string::traits_type::char_type* stmtString);
     const std::string::traits_type::char_type* GetPreparedStmtString_(_In_ sqlite3_stmt* stmt, _In_opt_ bool withBoundParameters = false);    
 
+    // stmtStepCallback 콜백에서 PrepareStmt 메서드 호출이 발생하면 preparedStmtInfoList_ 주소들이 다 바뀌므로 stmtInfo를 call-by-value로 받음
     Errors ExecStmt_(
-        _In_ const StmtInfo* stmtInfo,
+        _In_ const StmtInfo stmtInfo,
         _In_opt_ const std::vector<StmtBindParameterInfo>* stmtBindParameterInfoList = nullptr,
         _In_opt_ StepCallbackFunc* stmtStepCallback = nullptr
     );
