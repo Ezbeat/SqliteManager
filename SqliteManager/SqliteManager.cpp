@@ -994,8 +994,6 @@ int EzSqlite::SqliteManager::SqlitePrepareV2_(
 
         Sleep(static_cast<uint32_t>(intervalTime * 1000));
         stayTime += intervalTime;
-
-        std::cout << "StayTime: " << stayTime << std::endl;
     }
 
     return sqliteStatus;
