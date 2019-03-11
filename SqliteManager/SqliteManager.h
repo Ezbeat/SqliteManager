@@ -15,6 +15,8 @@
 namespace EzSqlite
 {
 
+const uint32_t kBusyTimeOutSecond = 15;
+
 /* std::string으로 된 값은 전부 utf8 */
 
 enum class DesiredAccess
@@ -32,10 +34,11 @@ enum class CreationDisposition
 
 enum class StmtIndex
 {
-    kBegin,     // BEGIN;
-    kCommit,    // COMMIT;
-    kRollback,  // ROLLBACK;
-    kVacuum,    // VACUUM;
+    kBegin,             // BEGIN;
+    kBeginImmediate,    // BEGIN IMMEDIATE
+    kCommit,            // COMMIT;
+    kRollback,          // ROLLBACK;
+    kVacuum,            // VACUUM;
 
     kBasicStmtNumber,
     kNoIndex = -1
@@ -47,7 +50,7 @@ enum class StmtType
     kAlterTable,            // ALTER TABLE
     kAnalyze,               // ANALYZE
     kAttach,                // ATTACH
-    kBegin,                 // BEGIN
+    kBegin,                 // BEGIN, BEGIN IMMEDIATE
     kCommit,                // COMMIT
     kCreateIndex,           // CREATE INDEX, CREATE UNIQUE INDEX
     kCreateTable,           // CREATE TABLE, CREATE TEMP TABLE, CREATE TEMPORARY TABLE
@@ -193,6 +196,17 @@ private:
 
     Errors StmtBindParameter_(_In_ const StmtInfo* stmtInfo, _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList);
     Errors VerifyTable_(_In_ const std::vector<std::string>& verifyTableStmtStringList);
+
+    // sqlite3_XXX 랩핑 함수
+    int SqliteStep_(sqlite3_stmt* stmt, uint32_t timeOutSecond = kBusyTimeOutSecond);
+    int SqlitePrepareV2_(
+        sqlite3 *db,
+        const char *zSql,
+        int nBytes,
+        sqlite3_stmt **ppStmt,
+        const char **pzTail,
+        uint32_t timeOutSecond = kBusyTimeOutSecond
+    );
 
 private:
     std::wstring databasePath_;

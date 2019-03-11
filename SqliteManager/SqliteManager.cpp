@@ -123,7 +123,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
 
         for (const auto& createTableStmtStringListEntry : *createTableStmtStringList)
         {
-            if (_strnicmp(createTableStmtStringListEntry.c_str(), "CREATE ", strlen("CREATE ") != 0))
+            if(GetStmtType_(createTableStmtStringListEntry.c_str()) != StmtType::kCreateTable)
             {
                 return retValue;
             }
@@ -224,7 +224,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
         return retValue;
     }
 
-    sqliteStatus = sqlite3_prepare_v2(
+    sqliteStatus = SqlitePrepareV2_(
         database_,
         stmtString.c_str(),
         -1,
@@ -365,7 +365,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt(
     retValue = FindPreparedStmt(stmtString, preparedStmtInfo);
     if (retValue == Errors::kNotFound)
     {
-        sqliteStatus = sqlite3_prepare_v2(
+        sqliteStatus = SqlitePrepareV2_(
             database_,
             stmtString.c_str(),
             -1,
@@ -422,6 +422,12 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareInternalStmt_()
 
     retValue = this->PrepareStmt("BEGIN;");
     if(retValue != Errors::kSuccess)
+    {
+        return retValue;
+    }
+
+    retValue = this->PrepareStmt("BEGIN IMMEDIATE;");
+    if (retValue != Errors::kSuccess)
     {
         return retValue;
     }
@@ -642,8 +648,8 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
         }
     }
 
-    sqliteStatus = sqlite3_step(stmtInfo->stmt);
-    stepCount++;
+    sqliteStatus = SqliteStep_(stmtInfo->stmt);
+    stepCount++;   
 
     do
     {
@@ -680,7 +686,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
             break;
         }
 
-        sqliteStatus = sqlite3_step(stmtInfo->stmt);
+        sqliteStatus = SqliteStep_(stmtInfo->stmt);
         stepCount++;
 
     } while (true);
@@ -903,13 +909,13 @@ EzSqlite::Errors EzSqlite::SqliteManager::VerifyTable_(
     retValue = Errors::kSuccess;
     for (const auto& verifyTableStmtStringListEntry : verifyTableStmtStringList)
     {
-        if (_strnicmp(verifyTableStmtStringListEntry.c_str(), "SELECT ", strlen("SELECT ") != 0))
+        if(GetStmtType_(verifyTableStmtStringListEntry.c_str()) != StmtType::kSelect)
         {
             retValue = Errors::kFailedVerifyTable;
             break;
         }
 
-        sqliteStatus = sqlite3_prepare_v2(
+        sqliteStatus = SqlitePrepareV2_(
             database_,
             verifyTableStmtStringListEntry.c_str(),
             -1,
@@ -927,4 +933,70 @@ EzSqlite::Errors EzSqlite::SqliteManager::VerifyTable_(
     }
 
     return retValue;
+}
+
+int EzSqlite::SqliteManager::SqliteStep_(
+    sqlite3_stmt* stmt,
+    uint32_t timeOutSecond /*= kBusyTimeOutSecond*/
+)
+{
+    int sqliteStatus = SQLITE_ERROR;
+
+    const double_t intervalTime = 0.5;
+    double_t stayTime = 0;
+
+    while (true)
+    {
+        sqliteStatus = sqlite3_step(
+            stmt
+        );
+
+        if ((sqliteStatus != SQLITE_BUSY) || (stayTime >= timeOutSecond))
+        {
+            break;
+        }
+
+        Sleep(static_cast<uint32_t>(intervalTime * 1000));
+        stayTime += intervalTime;
+    }
+
+    return sqliteStatus;
+}
+
+int EzSqlite::SqliteManager::SqlitePrepareV2_(
+    sqlite3 *db,
+    const char *zSql,
+    int nBytes,
+    sqlite3_stmt **ppStmt,
+    const char **pzTail,
+    uint32_t timeOutSecond /*= kBusyTimeOutSecond*/
+)
+{
+    int sqliteStatus = SQLITE_ERROR;
+
+    const double_t intervalTime = 0.5;
+    double_t stayTime = 0;
+
+    while (true)
+    {
+        sqliteStatus = sqlite3_prepare_v2(
+            db,
+            zSql,
+            nBytes,
+            ppStmt,
+            pzTail
+        );
+        
+        if ((sqliteStatus != SQLITE_BUSY) || (stayTime >= timeOutSecond))
+        {
+            break;
+        }
+
+        Sleep(static_cast<uint32_t>(intervalTime * 1000));
+        stayTime += intervalTime;
+
+        std::cout << "StayTime: " << stayTime << std::endl;
+    }
+
+    return sqliteStatus;
 }
