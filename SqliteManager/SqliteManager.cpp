@@ -450,6 +450,12 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareInternalStmt_()
         return retValue;
     }
 
+    retValue = this->PrepareStmt("PRAGMA journal_mode=WAL;");
+    if (retValue != Errors::kSuccess)
+    {
+        return retValue;
+    }
+
     retValue = Errors::kSuccess;
     return retValue;
 }
@@ -653,18 +659,21 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
 
     do
     {
-        if (sqliteStatus == SQLITE_ROW && stmtStepCallback != nullptr)
+        if (sqliteStatus == SQLITE_ROW)
         {
-            callbackStatus = (*stmtStepCallback)(stmtInfo);
-            if (callbackStatus == CallbackErrors::kStop)
+            if (stmtStepCallback != nullptr)
             {
-                retValue = Errors::kStopCallback;
-                break;
-            }
-            else if (callbackStatus == CallbackErrors::kFail)
-            {
-                retValue = Errors::kFailCallback;
-                break;
+                callbackStatus = (*stmtStepCallback)(stmtInfo);
+                if (callbackStatus == CallbackErrors::kStop)
+                {
+                    retValue = Errors::kStopCallback;
+                    break;
+                }
+                else if (callbackStatus == CallbackErrors::kFail)
+                {
+                    retValue = Errors::kFailCallback;
+                    break;
+                }
             }
         }
         else if (sqliteStatus == SQLITE_DONE)

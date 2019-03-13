@@ -15,7 +15,7 @@
 namespace EzSqlite
 {
 
-const uint32_t kBusyTimeOutSecond = 15;
+const uint32_t kBusyTimeOutSecond = 30;
 
 /* std::string으로 된 값은 전부 utf8 */
 
@@ -34,11 +34,12 @@ enum class CreationDisposition
 
 enum class StmtIndex
 {
-    kBegin,             // BEGIN;
-    kBeginImmediate,    // BEGIN IMMEDIATE
-    kCommit,            // COMMIT;
-    kRollback,          // ROLLBACK;
-    kVacuum,            // VACUUM;
+    kBegin,                 // BEGIN;
+    kBeginImmediate,        // BEGIN IMMEDIATE
+    kCommit,                // COMMIT;
+    kRollback,              // ROLLBACK;
+    kVacuum,                // VACUUM;
+    kPragmaJournalModeWal,  // PRAGMA journal_mode=WAL;
 
     kBasicStmtNumber,
     kNoIndex = -1
