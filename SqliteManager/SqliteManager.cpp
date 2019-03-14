@@ -172,6 +172,9 @@ EzSqlite::Errors EzSqlite::SqliteManager::CloseDatabase(
 
     this->ClearPreparedStmt(resetPreparedStmtIndex);
 
+    /*
+        저널 모드가 WAL인 경우 database가 read/write 로 열려 있어야 sqlite3_close할 때 .shm, .wal 파일이 정리 됨
+    */
     sqliteStatus = sqlite3_close(database_);
     if(sqliteStatus != SQLITE_OK)
     {
