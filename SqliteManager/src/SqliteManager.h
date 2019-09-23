@@ -1,5 +1,8 @@
-#ifndef __H_SQLITEMANAGER_H__
-#define __H_SQLITEMANAGER_H__
+/*!
+ * \author Ezbeat, Ji Hoon Park
+ */
+
+#pragma once
 
 #include "SqliteManagerErrors.h"
 
@@ -219,5 +222,3 @@ private:
 };
 
 } // namespace EzSqlite
-
-#endif // #ifndef __H_SQLITEMANAGER_H__
