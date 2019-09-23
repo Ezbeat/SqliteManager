@@ -147,13 +147,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="SqliteManager.cpp" />
-    <ClCompile Include="sqlite\sqlite3.c" />
+    <ClCompile Include="src\SqliteManager.cpp" />
+    <ClCompile Include="src\sqlite\sqlite3.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SqliteManager.h" />
     <ClInclude Include="SqliteManagerErrors.h" />
-    <ClInclude Include="sqlite\sqlite3.h" />
+    <ClInclude Include="src\sqlite\sqlite3.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

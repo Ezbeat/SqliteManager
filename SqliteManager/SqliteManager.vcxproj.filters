@@ -21,10 +21,10 @@
     <ClCompile Include="main.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="SqliteManager.cpp">
+    <ClCompile Include="src\SqliteManager.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="sqlite\sqlite3.c">
+    <ClCompile Include="src\sqlite\sqlite3.c">
       <Filter>sqlite</Filter>
     </ClCompile>
   </ItemGroup>
@@ -35,7 +35,7 @@
     <ClInclude Include="SqliteManagerErrors.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="sqlite\sqlite3.h">
+    <ClInclude Include="src\sqlite\sqlite3.h">
       <Filter>sqlite</Filter>
     </ClInclude>
   </ItemGroup>
