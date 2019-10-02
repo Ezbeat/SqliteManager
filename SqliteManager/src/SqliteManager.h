@@ -38,7 +38,7 @@ enum class CreationDisposition
 enum class StmtIndex
 {
     kBegin,                 // BEGIN;
-    kBeginImmediate,        // BEGIN IMMEDIATE
+    kBeginImmediate,        // BEGIN IMMEDIATE;
     kCommit,                // COMMIT;
     kRollback,              // ROLLBACK;
     kVacuum,                // VACUUM;
