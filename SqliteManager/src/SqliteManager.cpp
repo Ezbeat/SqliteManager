@@ -204,6 +204,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CloseDatabase(
 
 EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
     _In_ const std::string& stmtString, 
+    _In_opt_ uint32_t prepareFlags /*= SQLITE_PREPARE_PERSISTENT*/,
     _Out_opt_ uint32_t* preparedStmtIndex /*= nullptr*/
 )
 {
@@ -227,10 +228,11 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
         return retValue;
     }
 
-    sqliteStatus = SqlitePrepareV2_(
+    sqliteStatus = SqlitePrepareV3_(
         database_,
         stmtString.c_str(),
         -1,
+        prepareFlags,
         &stmtInfo.stmt,
         nullptr
     );
@@ -999,6 +1001,44 @@ int EzSqlite::SqliteManager::SqlitePrepareV2_(
             pzTail
         );
         
+        if ((sqliteStatus != SQLITE_BUSY) || (stayTime >= timeOutSecond))
+        {
+            break;
+        }
+
+        Sleep(static_cast<uint32_t>(intervalTime * 1000));
+        stayTime += intervalTime;
+    }
+
+    return sqliteStatus;
+}
+
+int EzSqlite::SqliteManager::SqlitePrepareV3_(
+    sqlite3 *db, 
+    const char *zSql, 
+    int nBytes, 
+    unsigned int prepFlags, 
+    sqlite3_stmt **ppStmt, 
+    const char **pzTail, 
+    uint32_t timeOutSecond /*= kBusyTimeOutSecond */
+)
+{
+    int sqliteStatus = SQLITE_ERROR;
+
+    const double_t intervalTime = 0.5;
+    double_t stayTime = 0;
+
+    while (true)
+    {
+        sqliteStatus = sqlite3_prepare_v3(
+            db,
+            zSql,
+            nBytes,
+            prepFlags,
+            ppStmt,
+            pzTail
+        );
+
         if ((sqliteStatus != SQLITE_BUSY) || (stayTime >= timeOutSecond))
         {
             break;

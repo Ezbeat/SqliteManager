@@ -149,7 +149,7 @@ public:
 
     Errors CloseDatabase(_In_opt_ bool deleteDatabase = false, _In_opt_ bool resetPreparedStmtIndex = false);
 
-    Errors PrepareStmt(_In_ const std::string& stmtString, _Out_opt_ uint32_t* preparedStmtIndex = nullptr);
+    Errors PrepareStmt(_In_ const std::string& stmtString, _In_opt_ uint32_t prepareFlags = SQLITE_PREPARE_PERSISTENT, _Out_opt_ uint32_t* preparedStmtIndex = nullptr);
     void ClearPreparedStmt(_In_opt_ bool resetPreparedStmtIndex = false);
 
     // preparedStmtInfo에 리턴되는 StmtInfo 주소 값은 vector 내 주소이므로 preparedStmtInfoList_에 값 변동 시 쓰레기 값이 됨.
@@ -208,6 +208,15 @@ private:
         sqlite3 *db,
         const char *zSql,
         int nBytes,
+        sqlite3_stmt **ppStmt,
+        const char **pzTail,
+        uint32_t timeOutSecond = kBusyTimeOutSecond
+    );
+    int SqlitePrepareV3_(
+        sqlite3 *db,
+        const char *zSql,
+        int nBytes,
+        unsigned int prepFlags,
         sqlite3_stmt **ppStmt,
         const char **pzTail,
         uint32_t timeOutSecond = kBusyTimeOutSecond
