@@ -685,7 +685,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
         {
             if ((stmtInfo.stmtType == StmtType::kSelect) && (stepCount == 1))
             {
-                retValue = Errors::kNotFound;
+                retValue = Errors::kNoResult;
             }
             else
             {

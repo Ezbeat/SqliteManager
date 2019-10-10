@@ -8,6 +8,7 @@ enum class Errors
     kSuccess,
     kAlreadyOpen,
     kNotFound,
+    kNoResult,
     kStopCallback,
     kFailCallback,
 
