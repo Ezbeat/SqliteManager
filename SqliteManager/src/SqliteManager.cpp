@@ -14,6 +14,8 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
     _In_ const std::wstring& databasePath,
     _In_ DesiredAccess desiredAccess,
     _In_ CreationDisposition creationDisposition,
+    _In_opt_ FPDataChangeNotificationCallback dataChangeNotificationCallback,
+    _In_opt_ void* dataChangeNotificationCallbackUserContext,
     _In_ const std::vector<std::string>& verifyTableStmtStringList,
     _In_opt_ const std::vector<std::string>* createTableStmtStringList /*= nullptr*/
 )
@@ -26,13 +28,13 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
     std::wstring_convert<std::codecvt_utf8<wchar_t>> convert;
     std::string databasePathUtf8;
 
-    auto raii = RAIIRegister([&] 
-    {
-        if (retValue == Errors::kUnsuccess)
+    auto raii = RAIIRegister([&]
         {
-            this->CloseDatabase();
-        }
-    });
+            if (retValue == Errors::kUnsuccess)
+            {
+                this->CloseDatabase();
+            }
+        });
 
     // SQLite Database가 열려있는 경우
     if (database_ != nullptr)
@@ -57,7 +59,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
     //
     // 인자 검증 
     //
-    
+
     // kReadOnly를 지정하려면 kOpenExisting 값이어야 됨
     if (desiredAccess == DesiredAccess::kReadOnly && creationDisposition != CreationDisposition::kOpenExisting)
     {
@@ -87,7 +89,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
     {
         openFlags = SQLITE_OPEN_READWRITE;
     }
-    
+
     sqliteStatus = sqlite3_open_v2(databasePathUtf8.c_str(), &database_, openFlags, nullptr);
     if ((sqliteStatus != SQLITE_OK) || (VerifyTable_(verifyTableStmtStringList) != Errors::kSuccess))
     {
@@ -114,7 +116,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
         {
             return retValue;
         }
-        
+
         // 테이블 생성
         if (createTableStmtStringList->size() == 0)
         {
@@ -123,7 +125,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
 
         for (const auto& createTableStmtStringListEntry : *createTableStmtStringList)
         {
-            if(GetStmtType_(createTableStmtStringListEntry.c_str()) != StmtType::kCreateTable)
+            if (GetStmtType_(createTableStmtStringListEntry.c_str()) != StmtType::kCreateTable)
             {
                 return retValue;
             }
@@ -141,6 +143,15 @@ EzSqlite::Errors EzSqlite::SqliteManager::CreateDatabase(
         return retValue;
     }
 
+    if (dataChangeNotificationCallback != nullptr)
+    {
+        SqliteUpdateHook_(
+            database_,
+            dataChangeNotificationCallback,
+            dataChangeNotificationCallbackUserContext
+        );
+    }
+
     databasePath_ = databasePath;
 
     retValue = Errors::kSuccess;
@@ -156,13 +167,13 @@ EzSqlite::Errors EzSqlite::SqliteManager::CloseDatabase(
 
     int sqliteStatus = SQLITE_ERROR;
 
-    auto raii = RAIIRegister([&] 
-    {
-        if (retValue != Errors::kSuccess)
+    auto raii = RAIIRegister([&]
         {
-            PrepareInternalStmt_();
-        }
-    });
+            if (retValue != Errors::kSuccess)
+            {
+                PrepareInternalStmt_();
+            }
+        });
 
     if (database_ == nullptr)
     {
@@ -176,7 +187,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CloseDatabase(
         저널 모드가 WAL인 경우 database가 read/write 로 열려 있어야 sqlite3_close할 때 .shm, .wal 파일이 정리 됨
     */
     sqliteStatus = sqlite3_close(database_);
-    if(sqliteStatus != SQLITE_OK)
+    if (sqliteStatus != SQLITE_OK)
     {
         /*sqlite3_stmt * stmt;
         while ((stmt = sqlite3_next_stmt(database_, NULL)) != NULL) {
@@ -194,7 +205,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CloseDatabase(
         {
             return retValue;
         }
-    }    
+    }
 
     databasePath_.clear();
 
@@ -203,7 +214,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::CloseDatabase(
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
-    _In_ const std::string& stmtString, 
+    _In_ const std::string& stmtString,
     _In_opt_ uint32_t prepareFlags /*= SQLITE_PREPARE_PERSISTENT*/,
     _Out_opt_ uint32_t* preparedStmtIndex /*= nullptr*/
 )
@@ -214,14 +225,14 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
 
     StmtInfo stmtInfo;
 
-    auto raii = RAIIRegister([&] 
-    {
-        if (retValue != Errors::kSuccess && stmtInfo.stmt != nullptr)
+    auto raii = RAIIRegister([&]
         {
-            sqlite3_finalize(stmtInfo.stmt);
-            stmtInfo.stmt = nullptr;
-        }
-    });
+            if (retValue != Errors::kSuccess && stmtInfo.stmt != nullptr)
+            {
+                sqlite3_finalize(stmtInfo.stmt);
+                stmtInfo.stmt = nullptr;
+            }
+        });
 
     if (database_ == nullptr)
     {
@@ -288,16 +299,16 @@ void EzSqlite::SqliteManager::ClearPreparedStmt(
     }
 
     preparedStmtInfoList_.clear();
-    preparedStmtIndexPointerList_.clear();    
+    preparedStmtIndexPointerList_.clear();
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::FindPreparedStmt(
-    _In_ const std::string& preparedStmtString, 
+    _In_ const std::string& preparedStmtString,
     _Out_ const StmtInfo*& preparedStmtInfo
 )
 {
     Errors retValue = Errors::kNotFound;
-    
+
     if (preparedStmtInfoList_.size() == 0)
     {
         return retValue;
@@ -308,7 +319,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::FindPreparedStmt(
         if (strcmp(GetPreparedStmtString_(preparedStmtInfoListEntry.stmt), preparedStmtString.c_str()) == 0)
         {
             preparedStmtInfo = &preparedStmtInfoListEntry;
-            
+
             retValue = Errors::kSuccess;
             break;
         }
@@ -353,14 +364,14 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt(
     const StmtInfo* preparedStmtInfo = nullptr;
     StmtInfo stmtInfo;
 
-    auto raii = RAIIRegister([&] 
-    {
-        if (stmtInfo.stmt != nullptr)
+    auto raii = RAIIRegister([&]
         {
-            sqlite3_finalize(stmtInfo.stmt);
-            stmtInfo.stmt = nullptr;
-        }
-    });
+            if (stmtInfo.stmt != nullptr)
+            {
+                sqlite3_finalize(stmtInfo.stmt);
+                stmtInfo.stmt = nullptr;
+            }
+        });
 
     if (database_ == nullptr)
     {
@@ -390,7 +401,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt(
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt(
-    _In_ uint32_t preparedStmtIndex, 
+    _In_ uint32_t preparedStmtIndex,
     _In_opt_ const std::vector<StmtBindParameterInfo>* stmtBindParameterInfoList /*= nullptr */,
     _In_opt_ StepCallbackFunc* stmtStepCallback /*= nullptr*/
 )
@@ -417,16 +428,16 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareInternalStmt_()
 {
     Errors retValue = Errors::kUnsuccess;
 
-    auto raii = RAIIRegister([&] 
-    {
-        if (retValue != Errors::kSuccess)
+    auto raii = RAIIRegister([&]
         {
-            this->ClearPreparedStmt();
-        }
-    });
+            if (retValue != Errors::kSuccess)
+            {
+                this->ClearPreparedStmt();
+            }
+        });
 
     retValue = this->PrepareStmt("BEGIN;");
-    if(retValue != Errors::kSuccess)
+    if (retValue != Errors::kSuccess)
     {
         return retValue;
     }
@@ -466,9 +477,9 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareInternalStmt_()
 }
 
 void EzSqlite::SqliteManager::GetStmtInfo_(
-    _In_ sqlite3_stmt* stmt, 
+    _In_ sqlite3_stmt* stmt,
     _Out_ StmtType& stmtType,
-    _Out_ uint32_t& columnCount, 
+    _Out_ uint32_t& columnCount,
     _Out_ uint32_t& bindParameterCount
 )
 {
@@ -635,10 +646,10 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
     CallbackErrors callbackStatus;
 
     auto raii = RAIIRegister([&]
-    {
-        sqlite3_clear_bindings(stmtInfo.stmt);
-        sqlite3_reset(stmtInfo.stmt);
-    });
+        {
+            sqlite3_clear_bindings(stmtInfo.stmt);
+            sqlite3_reset(stmtInfo.stmt);
+        });
 
     // Bind Parameter
     if (stmtInfo.bindParameterCount != 0)
@@ -660,7 +671,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
     }
 
     sqliteStatus = SqliteStep_(stmtInfo.stmt);
-    stepCount++;   
+    stepCount++;
 
     do
     {
@@ -691,7 +702,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
             {
                 retValue = Errors::kSuccess;
             }
-            
+
             break;
         }
         else
@@ -709,7 +720,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
-    _In_ const StmtInfo* stmtInfo, 
+    _In_ const StmtInfo* stmtInfo,
     _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList
 )
 {
@@ -905,14 +916,14 @@ EzSqlite::Errors EzSqlite::SqliteManager::VerifyTable_(
 
     sqlite3_stmt* stmt = nullptr;
 
-    auto raii = RAIIRegister([&] 
-    {
-        if (stmt != nullptr)
+    auto raii = RAIIRegister([&]
         {
-            sqlite3_finalize(stmt);
-            stmt = nullptr;
-        }
-    });
+            if (stmt != nullptr)
+            {
+                sqlite3_finalize(stmt);
+                stmt = nullptr;
+            }
+        });
 
     if (verifyTableStmtStringList.size() == 0)
     {
@@ -923,7 +934,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::VerifyTable_(
     retValue = Errors::kSuccess;
     for (const auto& verifyTableStmtStringListEntry : verifyTableStmtStringList)
     {
-        if(GetStmtType_(verifyTableStmtStringListEntry.c_str()) != StmtType::kSelect)
+        if (GetStmtType_(verifyTableStmtStringListEntry.c_str()) != StmtType::kSelect)
         {
             retValue = Errors::kFailedVerifyTable;
             break;
@@ -978,11 +989,11 @@ int EzSqlite::SqliteManager::SqliteStep_(
 }
 
 int EzSqlite::SqliteManager::SqlitePrepareV2_(
-    sqlite3 *db,
-    const char *zSql,
+    sqlite3* db,
+    const char* zSql,
     int nBytes,
-    sqlite3_stmt **ppStmt,
-    const char **pzTail,
+    sqlite3_stmt** ppStmt,
+    const char** pzTail,
     uint32_t timeOutSecond /*= kBusyTimeOutSecond*/
 )
 {
@@ -1000,7 +1011,7 @@ int EzSqlite::SqliteManager::SqlitePrepareV2_(
             ppStmt,
             pzTail
         );
-        
+
         if ((sqliteStatus != SQLITE_BUSY) || (stayTime >= timeOutSecond))
         {
             break;
@@ -1014,12 +1025,12 @@ int EzSqlite::SqliteManager::SqlitePrepareV2_(
 }
 
 int EzSqlite::SqliteManager::SqlitePrepareV3_(
-    sqlite3 *db, 
-    const char *zSql, 
-    int nBytes, 
-    unsigned int prepFlags, 
-    sqlite3_stmt **ppStmt, 
-    const char **pzTail, 
+    sqlite3* db,
+    const char* zSql,
+    int nBytes,
+    unsigned int prepFlags,
+    sqlite3_stmt** ppStmt,
+    const char** pzTail,
     uint32_t timeOutSecond /*= kBusyTimeOutSecond */
 )
 {
@@ -1049,4 +1060,17 @@ int EzSqlite::SqliteManager::SqlitePrepareV3_(
     }
 
     return sqliteStatus;
+}
+
+void EzSqlite::SqliteManager::SqliteUpdateHook_(
+    sqlite3* db,
+    FPDataChangeNotificationCallback dataChangeNotificationCallback,
+    void* userContext
+)
+{
+    sqlite3_update_hook(
+        db,
+        (void(*)(void*, int, char const*, char const*, sqlite_int64))(dataChangeNotificationCallback),
+        userContext
+    );
 }

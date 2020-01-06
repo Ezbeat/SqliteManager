@@ -18,6 +18,33 @@
 namespace EzSqlite
 {
 
+/*
+    sqlite3_update_hook 콜백 함수
+
+    userContext: sqlite3_update_hook 세번째 파라미터의 복사본
+    actionCode: 콜백을 발생시킨 Action (SQLITE_INSERT, SQLITE_DELETE, SQLITE_UPDATE)
+    dbName: 영향을 받는 Database 이름
+    tableName: 영향을 받는 Table 이름
+    rowid: 영향을 받은 rowid 값 (업데이트의 경우, 업데이트가 발생한 후의 rowid)
+
+    내부 시스템 테이블이 수정되는 경우는 콜백 호출되지 않음 (sqlite_master, sqlite_sequence)
+    WITHOUT ROWID 테이블의 경우 콜백이 호출되지 않음
+*/
+enum class CallbackActionCode
+{
+    kInsert = SQLITE_INSERT,
+    kDelete = SQLITE_DELETE,
+    kUpdate = SQLITE_UPDATE
+};
+
+typedef void (*FPDataChangeNotificationCallback)(
+    void* userContext,
+    CallbackActionCode actionCode,
+    char const* dbName,
+    char const* tableName,
+    sqlite_int64 rowid
+    );
+
 const uint32_t kBusyTimeOutSecond = 30;
 
 /* std::string으로 된 값은 전부 utf8 */
@@ -143,6 +170,8 @@ public:
         _In_ const std::wstring& databasePath,
         _In_ DesiredAccess desiredAccess,
         _In_ CreationDisposition creationDisposition,
+        _In_opt_ FPDataChangeNotificationCallback dataChangeNotificationCallback,
+        _In_opt_ void* dataChangeNotificationCallbackUserContext,
         _In_ const std::vector<std::string>& verifyTableStmtStringList,
         _In_opt_ const std::vector<std::string>* createTableStmtStringList = nullptr
     );
@@ -158,12 +187,12 @@ public:
     Errors FindPreparedStmt(_In_ uint32_t preparedStmtIndex, _Out_ const StmtInfo*& preparedStmtInfo);
 
     Errors ExecStmt(
-        _In_ const std::string& stmtString, 
+        _In_ const std::string& stmtString,
         _In_opt_ const std::vector<StmtBindParameterInfo>* stmtBindParameterInfoList = nullptr,
         _In_opt_ StepCallbackFunc* stmtStepCallback = nullptr
     );
     Errors ExecStmt(
-        _In_ uint32_t preparedStmtIndex, 
+        _In_ uint32_t preparedStmtIndex,
         _In_opt_ const std::vector<StmtBindParameterInfo>* stmtBindParameterInfoList = nullptr,
         _In_opt_ StepCallbackFunc* stmtStepCallback = nullptr
     );
@@ -190,7 +219,7 @@ private:
 
     void GetStmtInfo_(_In_ sqlite3_stmt* stmt, _Out_ StmtType& stmtType, _Out_ uint32_t& columnCount, _Out_ uint32_t& bindParameterCount);
     StmtType GetStmtType_(_In_ const std::string::traits_type::char_type* stmtString);
-    const std::string::traits_type::char_type* GetPreparedStmtString_(_In_ sqlite3_stmt* stmt, _In_opt_ bool withBoundParameters = false);    
+    const std::string::traits_type::char_type* GetPreparedStmtString_(_In_ sqlite3_stmt* stmt, _In_opt_ bool withBoundParameters = false);
 
     // stmtStepCallback 콜백에서 PrepareStmt 메서드 호출이 발생하면 preparedStmtInfoList_ 주소들이 다 바뀌므로 stmtInfo를 call-by-value로 받음
     Errors ExecStmt_(
@@ -205,21 +234,26 @@ private:
     // sqlite3_XXX 랩핑 함수
     int SqliteStep_(sqlite3_stmt* stmt, uint32_t timeOutSecond = kBusyTimeOutSecond);
     int SqlitePrepareV2_(
-        sqlite3 *db,
-        const char *zSql,
+        sqlite3* db,
+        const char* zSql,
         int nBytes,
-        sqlite3_stmt **ppStmt,
-        const char **pzTail,
+        sqlite3_stmt** ppStmt,
+        const char** pzTail,
         uint32_t timeOutSecond = kBusyTimeOutSecond
     );
     int SqlitePrepareV3_(
-        sqlite3 *db,
-        const char *zSql,
+        sqlite3* db,
+        const char* zSql,
         int nBytes,
         unsigned int prepFlags,
-        sqlite3_stmt **ppStmt,
-        const char **pzTail,
+        sqlite3_stmt** ppStmt,
+        const char** pzTail,
         uint32_t timeOutSecond = kBusyTimeOutSecond
+    );
+    void SqliteUpdateHook_(
+        sqlite3* db,
+        FPDataChangeNotificationCallback dataChangeNotificationCallback,
+        void* userContext
     );
 
 private:
