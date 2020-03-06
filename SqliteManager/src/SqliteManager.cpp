@@ -227,7 +227,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
 
     auto raii = RAIIRegister([&]
         {
-            if (retValue != Errors::kSuccess && stmtInfo.stmt != nullptr)
+            if ((retValue != Errors::kSuccess) && (stmtInfo.stmt != nullptr))
             {
                 sqlite3_finalize(stmtInfo.stmt);
                 stmtInfo.stmt = nullptr;
@@ -235,6 +235,13 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
         });
 
     if (database_ == nullptr)
+    {
+        return retValue;
+    }
+
+    // Pragma 명령문의 경우 Prepare만 해도 적용되어버리는 경우가 있기 때문에
+    // ExecStmt 메서드로만 실행하고 PrepareStmt에 등록 불가
+    if (GetStmtType_(stmtString.c_str()) == StmtType::kPragma)
     {
         return retValue;
     }
@@ -252,7 +259,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareStmt(
         return retValue;
     }
 
-    GetStmtInfo_(stmtInfo.stmt, stmtInfo.stmtType, stmtInfo.columnCount, stmtInfo.bindParameterCount);
+    GetStmtInfo_(stmtInfo);
 
     preparedStmtInfoList_.push_back(stmtInfo);
     preparedStmtIndexPointerList_.push_back(preparedStmtIndex);
@@ -316,7 +323,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::FindPreparedStmt(
 
     for (const auto& preparedStmtInfoListEntry : preparedStmtInfoList_)
     {
-        if (strcmp(GetPreparedStmtString_(preparedStmtInfoListEntry.stmt), preparedStmtString.c_str()) == 0)
+        if (strcmp(preparedStmtInfoListEntry.stmtString.c_str(), preparedStmtString.c_str()) == 0)
         {
             preparedStmtInfo = &preparedStmtInfoListEntry;
 
@@ -381,20 +388,28 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt(
     retValue = FindPreparedStmt(stmtString, preparedStmtInfo);
     if (retValue == Errors::kNotFound)
     {
-        sqliteStatus = SqlitePrepareV2_(
-            database_,
-            stmtString.c_str(),
-            -1,
-            &stmtInfo.stmt,
-            nullptr
-        );
-        if (sqliteStatus != SQLITE_OK)
+        if (GetStmtType_(stmtString.c_str()) != StmtType::kPragma)
         {
-            retValue = Errors::kUnsuccess;
-            return retValue;
-        }
+            sqliteStatus = SqlitePrepareV3_(
+                database_,
+                stmtString.c_str(),
+                -1,
+                SQLITE_PREPARE_PERSISTENT,
+                &stmtInfo.stmt,
+                nullptr
+            );
+            if (sqliteStatus != SQLITE_OK)
+            {
+                retValue = Errors::kUnsuccess;
+                return retValue;
+            }
 
-        GetStmtInfo_(stmtInfo.stmt, stmtInfo.stmtType, stmtInfo.columnCount, stmtInfo.bindParameterCount);
+            GetStmtInfo_(stmtInfo);
+        }
+        else
+        {
+            SetPragmaStmtInfo_(stmtString, stmtInfo);
+        }
     }
 
     return ExecStmt_(stmtInfo, stmtBindParameterInfoList, stmtStepCallback);
@@ -466,35 +481,23 @@ EzSqlite::Errors EzSqlite::SqliteManager::PrepareInternalStmt_()
         return retValue;
     }
 
-    retValue = this->PrepareStmt("PRAGMA journal_mode=WAL;");
-    if (retValue != Errors::kSuccess)
-    {
-        return retValue;
-    }
-
     retValue = Errors::kSuccess;
     return retValue;
 }
 
 void EzSqlite::SqliteManager::GetStmtInfo_(
-    _In_ sqlite3_stmt* stmt,
-    _Out_ StmtType& stmtType,
-    _Out_ uint32_t& columnCount,
-    _Out_ uint32_t& bindParameterCount
+    _Inout_ StmtInfo& stmtInfo
 )
 {
-    stmtType = StmtType::kUnknown;
-    columnCount = 0;
-    bindParameterCount = 0;
-
-    if (stmt == nullptr)
+    if (stmtInfo.stmt == nullptr)
     {
         return;
     }
 
-    stmtType = GetStmtType_(GetPreparedStmtString_(stmt));
-    columnCount = sqlite3_column_count(stmt);
-    bindParameterCount = sqlite3_bind_parameter_count(stmt);
+    stmtInfo.stmtString.assign(GetPreparedStmtString_(stmtInfo.stmt));
+    stmtInfo.stmtType = GetStmtType_(stmtInfo.stmtString.c_str());
+    stmtInfo.columnCount = sqlite3_column_count(stmtInfo.stmt);
+    stmtInfo.bindParameterCount = sqlite3_bind_parameter_count(stmtInfo.stmt);
 
     return;
 }
@@ -633,6 +636,18 @@ const std::string::traits_type::char_type* EzSqlite::SqliteManager::GetPreparedS
     }
 }
 
+void EzSqlite::SqliteManager::SetPragmaStmtInfo_(
+    _In_ const std::string& stmtString,
+    _Out_ StmtInfo& stmtInfo
+)
+{
+    stmtInfo.stmt = nullptr;
+    stmtInfo.stmtString = stmtString;
+    stmtInfo.stmtType = StmtType::kPragma;
+    stmtInfo.columnCount = 0;
+    stmtInfo.bindParameterCount = static_cast<uint32_t>(std::count(stmtString.begin(), stmtString.end(), '?'));
+}
+
 EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
     _In_ const StmtInfo stmtInfo,
     _In_opt_ const std::vector<StmtBindParameterInfo>* stmtBindParameterInfoList /*= nullptr */,
@@ -640,6 +655,8 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
 )
 {
     Errors retValue = Errors::kUnsuccess;
+
+    std::string pragmaStmtString;
 
     int sqliteStatus = SQLITE_ERROR;
     uint32_t stepCount = 0;
@@ -649,6 +666,10 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
         {
             sqlite3_clear_bindings(stmtInfo.stmt);
             sqlite3_reset(stmtInfo.stmt);
+            if (stmtInfo.stmtType == StmtType::kPragma)
+            {
+                sqlite3_finalize(stmtInfo.stmt);
+            }
         });
 
     // Bind Parameter
@@ -663,8 +684,35 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
             return retValue;
         }
 
-        retValue = StmtBindParameter_(&stmtInfo, *stmtBindParameterInfoList);
-        if (retValue != Errors::kSuccess)
+        if (stmtInfo.stmtType != StmtType::kPragma)
+        {
+            retValue = StmtBindParameter_(stmtInfo, *stmtBindParameterInfoList);
+            if (retValue != Errors::kSuccess)
+            {
+                return retValue;
+            }
+        }
+        else
+        {
+            retValue = PragmaStmtBindParameter_(stmtInfo, *stmtBindParameterInfoList, pragmaStmtString);
+            if (retValue != Errors::kSuccess)
+            {
+                return retValue;
+            }
+        }
+    }
+
+    if (stmtInfo.stmtType == StmtType::kPragma)
+    {
+        sqliteStatus = SqlitePrepareV3_(
+            database_,
+            pragmaStmtString.length() == 0 ? stmtInfo.stmtString.c_str() : pragmaStmtString.c_str(),
+            -1,
+            SQLITE_PREPARE_PERSISTENT,
+            &stmtInfo.stmt,
+            nullptr
+        );
+        if (sqliteStatus != SQLITE_OK)
         {
             return retValue;
         }
@@ -720,7 +768,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::ExecStmt_(
 }
 
 EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
-    _In_ const StmtInfo* stmtInfo,
+    _In_ const StmtInfo& stmtInfo,
     _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList
 )
 {
@@ -743,7 +791,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
                 {
                     sqliteStatus = sqlite3_bind_int(
-                        stmtInfo->stmt,
+                        stmtInfo.stmt,
                         parameterIndex++,
                         *reinterpret_cast<const int8_t*>(stmtBindParameterInfoListEntry.data)
                     );
@@ -751,7 +799,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
                 {
                     sqliteStatus = sqlite3_bind_int(
-                        stmtInfo->stmt,
+                        stmtInfo.stmt,
                         parameterIndex++,
                         *reinterpret_cast<const uint8_t*>(stmtBindParameterInfoListEntry.data)
                     );
@@ -762,7 +810,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
                 {
                     sqliteStatus = sqlite3_bind_int(
-                        stmtInfo->stmt,
+                        stmtInfo.stmt,
                         parameterIndex++,
                         *reinterpret_cast<const int16_t*>(stmtBindParameterInfoListEntry.data)
                     );
@@ -770,7 +818,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
                 {
                     sqliteStatus = sqlite3_bind_int(
-                        stmtInfo->stmt,
+                        stmtInfo.stmt,
                         parameterIndex++,
                         *reinterpret_cast<const uint16_t*>(stmtBindParameterInfoListEntry.data)
                     );
@@ -781,7 +829,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
                 {
                     sqliteStatus = sqlite3_bind_int(
-                        stmtInfo->stmt,
+                        stmtInfo.stmt,
                         parameterIndex++,
                         *reinterpret_cast<const int32_t*>(stmtBindParameterInfoListEntry.data)
                     );
@@ -789,7 +837,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
                 {
                     sqliteStatus = sqlite3_bind_int(
-                        stmtInfo->stmt,
+                        stmtInfo.stmt,
                         parameterIndex++,
                         *reinterpret_cast<const uint32_t*>(stmtBindParameterInfoListEntry.data)
                     );
@@ -800,7 +848,7 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
                 {
                     sqliteStatus = sqlite3_bind_int64(
-                        stmtInfo->stmt,
+                        stmtInfo.stmt,
                         parameterIndex++,
                         *reinterpret_cast<const int64_t*>(stmtBindParameterInfoListEntry.data)
                     );
@@ -808,20 +856,19 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
                 {
                     sqliteStatus = sqlite3_bind_int64(
-                        stmtInfo->stmt,
+                        stmtInfo.stmt,
                         parameterIndex++,
                         *reinterpret_cast<const uint64_t*>(stmtBindParameterInfoListEntry.data)
                     );
                 }
             }
-
             break;
 
         case StmtDataType::kFloat:
             if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(float_t))
             {
                 sqliteStatus = sqlite3_bind_double(
-                    stmtInfo->stmt,
+                    stmtInfo.stmt,
                     parameterIndex++,
                     *reinterpret_cast<const float_t*>(stmtBindParameterInfoListEntry.data)
                 );
@@ -829,19 +876,18 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
             else if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(double_t))
             {
                 sqliteStatus = sqlite3_bind_double(
-                    stmtInfo->stmt,
+                    stmtInfo.stmt,
                     parameterIndex++,
                     *reinterpret_cast<const double_t*>(stmtBindParameterInfoListEntry.data)
                 );
             }
-
             break;
 
         case StmtDataType::kText:
             if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kDestructorStatic)
             {
                 sqliteStatus = sqlite3_bind_text(
-                    stmtInfo->stmt,
+                    stmtInfo.stmt,
                     parameterIndex++,
                     reinterpret_cast<const std::string::traits_type::char_type*>(stmtBindParameterInfoListEntry.data),
                     stmtBindParameterInfoListEntry.dataByteSize == 0 ? -1 : stmtBindParameterInfoListEntry.dataByteSize,
@@ -852,21 +898,20 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kDestructorTransient)
             {
                 sqliteStatus = sqlite3_bind_text(
-                    stmtInfo->stmt,
+                    stmtInfo.stmt,
                     parameterIndex++,
                     reinterpret_cast<const std::string::traits_type::char_type*>(stmtBindParameterInfoListEntry.data),
                     stmtBindParameterInfoListEntry.dataByteSize == 0 ? -1 : stmtBindParameterInfoListEntry.dataByteSize,
                     SQLITE_TRANSIENT
                 );
             }
-
             break;
 
         case StmtDataType::kBlob:
             if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kDestructorStatic)
             {
                 sqliteStatus = sqlite3_bind_blob(
-                    stmtInfo->stmt,
+                    stmtInfo.stmt,
                     parameterIndex++,
                     stmtBindParameterInfoListEntry.data,
                     stmtBindParameterInfoListEntry.dataByteSize,
@@ -877,27 +922,114 @@ EzSqlite::Errors EzSqlite::SqliteManager::StmtBindParameter_(
                 stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kDestructorTransient)
             {
                 sqliteStatus = sqlite3_bind_blob(
-                    stmtInfo->stmt,
+                    stmtInfo.stmt,
                     parameterIndex++,
                     stmtBindParameterInfoListEntry.data,
                     stmtBindParameterInfoListEntry.dataByteSize,
                     SQLITE_TRANSIENT
                 );
             }
-
             break;
 
         case StmtDataType::kNull:
             sqliteStatus = sqlite3_bind_null(
-                stmtInfo->stmt,
+                stmtInfo.stmt,
                 parameterIndex++
             );
-
             break;
         }
 
         if (sqliteStatus != SQLITE_OK)
         {
+            return retValue;
+        }
+    }
+
+    retValue = Errors::kSuccess;
+    return retValue;
+}
+
+EzSqlite::Errors EzSqlite::SqliteManager::PragmaStmtBindParameter_(
+    _In_ const StmtInfo& stmtInfo,
+    _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList,
+    _Out_ std::string& pragmaStmtString
+)
+{
+    Errors retValue = Errors::kUnsuccess;
+
+    size_t pragmaStmtStringOffset = 0;
+
+    auto raii = RAIIRegister([&]
+        {
+            if ((retValue != Errors::kSuccess) && (pragmaStmtString.length() != 0))
+            {
+                pragmaStmtString.clear();
+            }
+        });
+
+    pragmaStmtString = stmtInfo.stmtString;
+
+    for (const auto& stmtBindParameterInfoListEntry : stmtBindParameterInfoList)
+    {
+        pragmaStmtStringOffset = pragmaStmtString.find_first_of('?', pragmaStmtStringOffset);
+        pragmaStmtString.erase(pragmaStmtStringOffset, 1);
+
+        switch (stmtBindParameterInfoListEntry.dataType)
+        {
+        case StmtDataType::kInteger:
+            if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(int8_t))
+            {
+                if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
+                {
+                    pragmaStmtString.insert(pragmaStmtStringOffset, std::to_string(*reinterpret_cast<const int8_t*>(stmtBindParameterInfoListEntry.data)));
+                }
+                else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
+                {
+                    pragmaStmtString.insert(pragmaStmtStringOffset, std::to_string(*reinterpret_cast<const uint8_t*>(stmtBindParameterInfoListEntry.data)));
+                }
+            }
+            else if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(int16_t))
+            {
+                if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
+                {
+                    pragmaStmtString.insert(pragmaStmtStringOffset, std::to_string(*reinterpret_cast<const int16_t*>(stmtBindParameterInfoListEntry.data)));
+                }
+                else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
+                {
+                    pragmaStmtString.insert(pragmaStmtStringOffset, std::to_string(*reinterpret_cast<const uint16_t*>(stmtBindParameterInfoListEntry.data)));
+                }
+            }
+            else if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(int32_t))
+            {
+                if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
+                {
+                    pragmaStmtString.insert(pragmaStmtStringOffset, std::to_string(*reinterpret_cast<const int32_t*>(stmtBindParameterInfoListEntry.data)));
+                }
+                else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
+                {
+                    pragmaStmtString.insert(pragmaStmtStringOffset, std::to_string(*reinterpret_cast<const uint32_t*>(stmtBindParameterInfoListEntry.data)));
+                }
+            }
+            else if (stmtBindParameterInfoListEntry.dataByteSize == sizeof(int64_t))
+            {
+                if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kSigned)
+                {
+                    pragmaStmtString.insert(pragmaStmtStringOffset, std::to_string(*reinterpret_cast<const int64_t*>(stmtBindParameterInfoListEntry.data)));
+                }
+                else if (stmtBindParameterInfoListEntry.options == StmtBindParameterOptions::kUnsigned)
+                {
+                    pragmaStmtString.insert(pragmaStmtStringOffset, std::to_string(*reinterpret_cast<const uint64_t*>(stmtBindParameterInfoListEntry.data)));
+                }
+            }
+            break;
+            // [TODO] 아래 Type들은 필요 시 개발
+        case StmtDataType::kFloat:
+            return retValue;
+        case StmtDataType::kText:
+            return retValue;
+        case StmtDataType::kBlob:
+            return retValue;
+        case StmtDataType::kNull:
             return retValue;
         }
     }

@@ -69,7 +69,6 @@ enum class StmtIndex
     kCommit,                // COMMIT;
     kRollback,              // ROLLBACK;
     kVacuum,                // VACUUM;
-    kPragmaJournalModeWal,  // PRAGMA journal_mode=WAL;
 
     kBasicStmtNumber,
     kNoIndex = -1
@@ -153,6 +152,7 @@ struct StmtInfo
     };
 
     mutable sqlite3_stmt* stmt; // 외부 라이브러리 변수라서 mutable 선언
+    std::string stmtString;
     StmtType stmtType;
     uint32_t columnCount;
     uint32_t bindParameterCount;
@@ -186,6 +186,13 @@ public:
     Errors FindPreparedStmt(_In_ const std::string& preparedStmtString, _Out_ const StmtInfo*& preparedStmtInfo);
     Errors FindPreparedStmt(_In_ uint32_t preparedStmtIndex, _Out_ const StmtInfo*& preparedStmtInfo);
 
+    /*
+        명령문을 Prepared하고 데이터를 Bind해서 처리하는 이유
+        1. Insert 해야 될 데이터가 유동적인 경우 처리하기가 편함
+        2. 내부 처리 구문으로 재컴파일 할 필요가 없기 때문에 속도가 빠름
+        3. Binding을 하게되면 문자열에 따옴표를 사용하지 않게 되므로 SQL Injection 공격의 위험이 줄어듦
+        4. 큰 문자열을 구문 분석하거나 복사 할 필요가 없으므로 속도가 빠름
+    */
     Errors ExecStmt(
         _In_ const std::string& stmtString,
         _In_opt_ const std::vector<StmtBindParameterInfo>* stmtBindParameterInfoList = nullptr,
@@ -217,9 +224,10 @@ private:
 private:
     Errors PrepareInternalStmt_();
 
-    void GetStmtInfo_(_In_ sqlite3_stmt* stmt, _Out_ StmtType& stmtType, _Out_ uint32_t& columnCount, _Out_ uint32_t& bindParameterCount);
+    void GetStmtInfo_(_Inout_ StmtInfo& stmtInfo);
     StmtType GetStmtType_(_In_ const std::string::traits_type::char_type* stmtString);
     const std::string::traits_type::char_type* GetPreparedStmtString_(_In_ sqlite3_stmt* stmt, _In_opt_ bool withBoundParameters = false);
+    void SetPragmaStmtInfo_(_In_ const std::string& stmtString, _Out_ StmtInfo& stmtInfo);
 
     // stmtStepCallback 콜백에서 PrepareStmt 메서드 호출이 발생하면 preparedStmtInfoList_ 주소들이 다 바뀌므로 stmtInfo를 call-by-value로 받음
     Errors ExecStmt_(
@@ -228,7 +236,8 @@ private:
         _In_opt_ StepCallbackFunc* stmtStepCallback = nullptr
     );
 
-    Errors StmtBindParameter_(_In_ const StmtInfo* stmtInfo, _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList);
+    Errors StmtBindParameter_(_In_ const StmtInfo& stmtInfo, _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList);
+    Errors PragmaStmtBindParameter_(_In_ const StmtInfo& stmtInfo, _In_ const std::vector<StmtBindParameterInfo>& stmtBindParameterInfoList, _Out_ std::string& pragmaStmtString);
     Errors VerifyTable_(_In_ const std::vector<std::string>& verifyTableStmtStringList);
 
     // sqlite3_XXX 랩핑 함수
